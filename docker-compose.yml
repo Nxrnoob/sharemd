@@ -6,7 +6,7 @@ services:
   sharemd:
     build: .
     ports:
-      - '3000:3000'
+      - '3001:3000' # host 3000 was taken; container still serves 3000 internally
     environment:
       DATABASE_PATH: /data/local.db
     volumes:
