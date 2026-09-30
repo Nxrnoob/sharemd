@@ -1,42 +1,41 @@
-# sv
+# ShareMD
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Paste markdown, get an unlisted link that reads well. Thats the whole app.
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
+## Run it
 
 ```sh
-# create a new project
-npx sv create my-app
+bun install
+bun run db:migrate
+bun run dev
 ```
 
-To recreate this project with the same configuration:
+Share flow: paste text or drop a `.md` file on `/` -> get `/s/<id>`. Append `?theme=nxr` (or any theme) and the link carries that theme with it.
+
+## What it does
+
+- Renders GFM properly (tables, task lists, code blocks with Shiki highlighting), sanitized so shared links cant run scripts
+- 10 themes, monochrome default, switcher in the header
+- Reader has TOC rail + floating TOC, progress bar, read time, back to top, header hides on scroll
+- Rate limited uploads (20/hr per IP), 512KB cap per doc
+
+## Stack
+
+SvelteKit 5 + Bun + Drizzle + SQLite (better-sqlite3). Fonts are self-hosted Fontsource, zero external requests.
+
+## Deploy (Dokploy)
 
 ```sh
-# recreate this project
-bun x sv@0.17.1 create --template minimal --types ts --add tailwindcss="plugins:typography" drizzle="database:sqlite+sqlite:better-sqlite3" sveltekit-adapter="adapter:auto" --no-download-check --install bun .
+docker compose up -d --build
 ```
 
-## Developing
+DB lives at `/data/local.db`, so mount a volume there (`sharemd-data:/data`). Migrations run on boot, nothing manual needed. Single replica is fine, the rate limiter is in-memory.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Env
 
-```sh
-npm run dev
+| Var | Default | What |
+|---|---|---|
+| `DATABASE_PATH` | `/data/local.db` (local dev: `./local.db` via `.env`) | SQLite file |
+| `PORT` / `HOST` | `3000` / `0.0.0.0` | Server bind |
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Copy `.env.example` to `.env` for local dev.
