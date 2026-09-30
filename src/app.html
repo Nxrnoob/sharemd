@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" class="dark" data-theme="monochrome">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content="ShareMD — paste markdown, share a clean page. No accounts, unlisted links." />
+		<meta name="theme-color" content="#000000" />
+		<meta name="text-scale" content="scale" />
+		<script>
+			// Runs before first paint: a valid ?theme= link param wins, then the
+			// saved editor theme, then the monochrome default. No flash.
+			try {
+				var valid = [
+					'monochrome',
+					'nxr',
+					'dracula',
+					'catppuccin-mocha',
+					'catppuccin-latte',
+					'nord',
+					'github-dark',
+					'monokai',
+					'tokyo-night',
+					'gruvbox'
+				];
+				var q = null;
+				try {
+					q = new URLSearchParams(location.search).get('theme');
+				} catch (_) {}
+				var t = valid.indexOf(q) >= 0 ? q : localStorage.getItem('sharemd-theme');
+				if (t === 'dark' || t === 'deep-black') t = 'monochrome';
+				else if (t === 'light') t = 'catppuccin-latte';
+				if (valid.indexOf(t) < 0) t = 'monochrome';
+				var dark = t !== 'catppuccin-latte';
+				var root = document.documentElement;
+				root.dataset.theme = t;
+				root.classList.toggle('dark', dark);
+				root.style.colorScheme = dark ? 'dark' : 'light';
+				var meta = document.querySelector('meta[name="theme-color"]');
+				if (meta) {
+					var bg = {
+						monochrome: '#000000',
+						nxr: '#000000',
+						dracula: '#282a36',
+						'catppuccin-mocha': '#1e1e2e',
+						'catppuccin-latte': '#eff1f5',
+						nord: '#2e3440',
+						'github-dark': '#0d1117',
+						monokai: '#272822',
+						'tokyo-night': '#1a1b26',
+						gruvbox: '#282828'
+					}[t];
+					if (bg) meta.setAttribute('content', bg);
+				}
+			} catch (_) {
+				document.documentElement.dataset.theme = 'monochrome';
+				document.documentElement.classList.add('dark');
+			}
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

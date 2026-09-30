@@ -1,0 +1,17 @@
+# Dokploy: 1) New Application → connect repo. 2) Build Type Dockerfile (or Compose) using this file.
+# 3) Mounts: add volume sharemd-data → /data (SQLite lives here). 4) Domains: add domain + SSL.
+# 5) Deploy → verify POST /api/docs; redeploys reuse the volume so docs persist.
+# NOTE: the POST rate limiter is a single-process in-memory Map — fine on ONE replica; do not scale past 1 without shared state.
+services:
+  sharemd:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_PATH: /data/local.db
+    volumes:
+      - sharemd-data:/data
+    restart: unless-stopped
+
+volumes:
+  sharemd-data:

@@ -1,0 +1,8 @@
+node_modules
+.svelte-kit
+build
+local.db
+*.db-wal
+*.db-shm
+.git
+tool-output
