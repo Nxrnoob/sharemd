@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import Toast from '$lib/components/Toast.svelte';
+	import { copyText } from '$lib/clipboard';
 	import { buildThemedUrl, isThemeId, DEFAULT_THEME_ID } from '$lib/themes';
 	import type { ThemeId } from '$lib/themes';
 
@@ -101,10 +102,9 @@
 			const saved = typeof document !== 'undefined' ? document.documentElement.dataset.theme : null;
 			const themeId: ThemeId = isThemeId(saved) ? saved : DEFAULT_THEME_ID;
 			const url = buildThemedUrl(`/s/${out.id}`, themeId);
-			try {
-				await navigator.clipboard.writeText(new URL(url, location.origin).href);
+			if (await copyText(new URL(url, location.origin).href)) {
 				showToast('Shared. Link copied. Paste it anywhere.', 'ok', url);
-			} catch {
+			} else {
 				showToast('Shared. Copy the link from the address bar.', 'ok', url);
 			}
 			setTimeout(() => goto(url), 650);

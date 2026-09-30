@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { codeCopy } from '$lib/actions/codeCopy';
+	import { copyText } from '$lib/clipboard';
 	import Toast from '$lib/components/Toast.svelte';
 	import TocRail from '$lib/components/TocRail.svelte';
 	import TocFloating from '$lib/components/TocFloating.svelte';
@@ -52,10 +53,9 @@
 	}
 
 	async function copyLink() {
-		try {
-			await navigator.clipboard.writeText(shareUrl);
+		if (await copyText(shareUrl)) {
 			flash('Link copied. Paste it anywhere.');
-		} catch {
+		} else {
 			flash('Copy failed. Copy the address bar URL instead.');
 		}
 	}

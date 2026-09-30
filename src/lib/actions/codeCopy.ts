@@ -1,3 +1,5 @@
+import { copyText } from '$lib/clipboard';
+
 /**
  * Svelte action: adds a "Copy" button to every <pre> inside the node.
  * Works on server-rendered {@html} without re-parsing markdown,
@@ -15,12 +17,7 @@ export function codeCopy(node: HTMLElement) {
 		btn.setAttribute('aria-label', 'Copy code block');
 		btn.addEventListener('click', async () => {
 			const code = pre.querySelector('code')?.innerText ?? pre.innerText;
-			try {
-				await navigator.clipboard.writeText(code);
-				btn.textContent = 'Copied';
-			} catch {
-				btn.textContent = 'Failed';
-			}
+			btn.textContent = (await copyText(code)) ? 'Copied' : 'Failed';
 			setTimeout(() => (btn.textContent = 'Copy'), 1600);
 		});
 		pre.appendChild(btn);
