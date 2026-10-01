@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { codeCopy } from '$lib/actions/codeCopy';
@@ -140,15 +140,36 @@
 		}
 
 		// Follow later viewer picks (ThemePicker) so buttons share the screen.
+		// Compare-then-bail: setAttribute fires the observer even when the
+		// value is unchanged, and that must never churn screenTheme (which
+		// feeds the share-URL deriveds) on its own.
 		const themeObs = new MutationObserver(() => {
 			const ds = document.documentElement.dataset.theme;
-			if (isThemeId(ds)) screenTheme = ds;
+			if (isThemeId(ds) && screenTheme !== ds) screenTheme = ds;
 		});
 		themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 		return () => {
 			themeObs.disconnect();
 			delete document.documentElement.dataset.tocOpen;
 		};
+	});
+
+	// Client navigates reuse this component instance, so onMount does NOT
+	// re-run for the second doc. Re-sync the screen theme when the doc or
+	// query string swaps. The DOM paint is fire-and-forget (zero state
+	// writes); the state set is compare-then-bail with untracked reads, so
+	// the only tracked deps are (data.id, page.url.search) and it settles.
+	$effect(() => {
+		void data.id;
+		const search = page.url.search;
+		const override = getThemeFromUrl(search);
+		if (override) {
+			if (document.documentElement.dataset.theme !== override) applySessionTheme(override);
+			if (untrack(() => screenTheme) !== override) screenTheme = override;
+		} else {
+			const ds = document.documentElement.dataset.theme;
+			if (isThemeId(ds) && untrack(() => screenTheme) !== ds) screenTheme = ds;
+		}
 	});
 
 	// Rebuild the TOC whenever the article element renders or the unlocked
@@ -159,8 +180,8 @@
 		const el = articleEl;
 		const html = data.html;
 		if (!el || !html) {
-			toc = [];
-			activeId = null;
+			if (untrack(() => toc).length) toc = [];
+			if (untrack(() => activeId) !== null) activeId = null;
 			return;
 		}
 		// h1-h3 only by design; skip anything inside <pre> (code text, never
@@ -170,7 +191,7 @@
 		const heads = Array.from(el.querySelectorAll('h1[id], h2[id], h3[id]')).filter(
 			(h) => !h.closest('pre')
 		);
-		toc = heads
+		const next = heads
 			.map((h) => ({
 				id: h.id,
 				text: (h.textContent ?? '').trim().slice(0, 80),
@@ -181,13 +202,23 @@
 				seen.add(t.id);
 				return true;
 			});
-		activeId = toc[0]?.id ?? null;
+		// Compare-then-bail with untracked reads: deps stay exactly
+		// (articleEl, data.html), so assigning here can never retrigger.
+		const prev = untrack(() => toc);
+		const same =
+			prev.length === next.length &&
+			next.every((t, i) => t.id === prev[i].id && t.text === prev[i].text && t.level === prev[i].level);
+		if (!same) toc = next;
+		const first = next[0]?.id ?? null;
+		if (untrack(() => activeId) !== first) activeId = first;
 
 		// Scrollspy: highlight the heading nearest the top of the viewport.
+		// Guarded writes: repeat intersections of the same heading never
+		// churn state (this callback is outside reactive tracking anyway).
 		const spy = new IntersectionObserver(
 			(entries) => {
 				for (const entry of entries) {
-					if (entry.isIntersecting) activeId = entry.target.id;
+					if (entry.isIntersecting && activeId !== entry.target.id) activeId = entry.target.id;
 				}
 			},
 			{ rootMargin: '-72px 0px -75% 0px', threshold: 0 }
@@ -275,7 +306,7 @@
 		</div>
 	</main>
 {:else}
-<ReadingProgress getTarget={() => articleEl} />
+<ReadingProgress target={articleEl} />
 
 <!-- top bar -->
 <div class="border-b border-line bg-surface/80 backdrop-blur dark:border-night-line dark:bg-night-surface/80">
@@ -353,7 +384,7 @@
 		</div>
 		<TocRail items={toc} activeId={activeId} />
 	</div>
-	<Mermaid article={articleEl} />
+		<Mermaid article={articleEl} rev={data.id} />
 </main>
 {/if}
 

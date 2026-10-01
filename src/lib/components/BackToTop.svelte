@@ -14,9 +14,11 @@
 		let raf = 0;
 		const measure = () => {
 			raf = 0;
-			// Only on pages that actually scroll.
+			// Only on pages that actually scroll. Compare-then-bail: scroll
+			// frames that change nothing must not churn state.
 			const scrollable = document.documentElement.scrollHeight > window.innerHeight + 40;
-			visible = scrollable && window.scrollY > SHOW_AFTER;
+			const next = scrollable && window.scrollY > SHOW_AFTER;
+			if (visible !== next) visible = next;
 		};
 		const schedule = () => {
 			if (!raf) raf = requestAnimationFrame(measure);

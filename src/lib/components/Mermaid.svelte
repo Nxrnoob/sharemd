@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	let { article = null }: { article: HTMLElement | null } = $props();
+	// `rev` is the content key (the doc id): client navigates swap innerHTML
+	// inside the SAME <article> node, so the element identity never changes
+	// and this is the stable dep that re-runs rendering for the new doc.
+	let { article = null, rev = '' }: { article: HTMLElement | null; rev?: string } = $props();
 
 	const rendered = new Map<Element, { src: string; key: string; wrap: HTMLDivElement }>();
+	let lastRev: string | null = null;
 	let lastRoot: HTMLElement | null = null;
 	let runId = 0;
+	let uid = 0;
 	let dead = false;
+	let themeTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function themeKey(): string {
 		const root = document.documentElement;
@@ -14,15 +20,22 @@
 	}
 
 	async function renderAll() {
+		// Every invocation invalidates older in-flight runs, so rapid theme
+		// preview hovers collapse to the latest paint instead of racing.
+		const my = ++runId;
 		const root = article;
 		if (!root || typeof document === 'undefined' || dead) return;
-		if (root !== lastRoot) {
-			rendered.clear();
-			lastRoot = root;
+		// Drop entries orphaned by innerHTML swaps (client navigate/unlock);
+		// their wraps went away with the old content.
+		for (const [pre, info] of rendered) {
+			if (my !== runId || dead) return;
+			if (!pre.isConnected) {
+				rendered.delete(pre);
+				if (info.wrap.isConnected) info.wrap.remove();
+			}
 		}
 		const blocks = root.querySelectorAll<HTMLElement>('pre.mermaid-block');
 		if (!blocks.length) return;
-		const my = ++runId;
 		let mermaid: typeof import('mermaid').default;
 		try {
 			({ default: mermaid } = await import('mermaid'));
@@ -63,7 +76,7 @@
 			prev?.wrap.remove();
 			rendered.delete(pre);
 			try {
-				const { svg } = await mermaid.render(`mmd-${Date.now().toString(36)}-${n++}`, src);
+				const { svg } = await mermaid.render(`mmd-${Date.now().toString(36)}-${uid++}-${n++}`, src);
 				if (my !== runId || dead) return;
 				const wrap = document.createElement('div');
 				wrap.className = 'mermaid-diagram';
@@ -80,22 +93,46 @@
 		}
 	}
 
-	// Re-run when the article swaps (same-component navigation) and whenever
-	// the app theme flips. Effects never run on the server.
+	// Trailing debounce: hover previews repaint data-theme many times per
+	// second; only the settled theme gets a (costly) re-render. Pure DOM
+	// work, zero state writes, so this can never feed an effect loop.
+	function scheduleThemeRender() {
+		if (themeTimer) clearTimeout(themeTimer);
+		themeTimer = setTimeout(() => {
+			themeTimer = null;
+			void renderAll();
+		}, 120);
+	}
+
+	// Re-run when the article swaps or the content key flips (same-node
+	// innerHTML swap on client navigation) and on settled theme flips.
+	// Tracked deps are exactly (article, rev); effects never run on server.
 	$effect(() => {
 		const root = article;
-		if (root) void renderAll();
-		const obs = new MutationObserver(() => void renderAll());
+		void rev;
+		if (!root) return;
+		if (rev !== lastRev || root !== lastRoot) {
+			rendered.clear();
+			lastRev = rev;
+			lastRoot = root;
+		}
+		void renderAll();
+		const obs = new MutationObserver(scheduleThemeRender);
 		obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
 		return () => {
 			runId++;
 			obs.disconnect();
+			if (themeTimer) {
+				clearTimeout(themeTimer);
+				themeTimer = null;
+			}
 		};
 	});
 
 	onDestroy(() => {
 		dead = true;
 		runId++;
+		if (themeTimer) clearTimeout(themeTimer);
 	});
 </script>
 

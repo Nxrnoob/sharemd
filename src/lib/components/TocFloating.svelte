@@ -14,8 +14,11 @@
 	const current = $derived(items.find((i) => i.id === activeId) ?? items[0] ?? null);
 
 	function onScroll() {
-		pastHero = window.scrollY > 400;
-		if (!pastHero && open) {
+		// Compare-then-bail: most scroll frames change nothing and must not
+		// churn state (this handler is outside reactive tracking anyway).
+		const next = window.scrollY > 400;
+		if (pastHero !== next) pastHero = next;
+		if (!next && open) {
 			open = false;
 			delete document.documentElement.dataset.tocOpen;
 		}
