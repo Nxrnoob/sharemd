@@ -222,11 +222,12 @@
 				<span class="grid size-7 place-items-center bg-ink font-mono text-xs font-medium text-white dark:bg-surface dark:text-ink">M</span>
 				<span class="font-display text-[15px] font-bold tracking-tight">ShareMD</span>
 			</div>
-			<div class="rise rise-1">
-				<p class="font-mono text-xs tracking-widest text-ink-soft uppercase dark:text-slate-400">
+			<div class="rise rise-1 min-w-0">
+				<p class="font-mono relative text-xs tracking-widest text-ink-soft uppercase dark:text-slate-400">
 					Markdown sharing for developers
 				</p>
-				<h1 class="font-display mt-3 text-4xl leading-[1.08] font-bold tracking-tight text-balance sm:text-5xl lg:text-[2.75rem]">
+				<span aria-hidden="true" class="ghost-word relative mt-2 block text-[clamp(2.75rem,10vw,4.5rem)] leading-[0.9] tracking-tight">PASTE</span>
+				<h1 class="font-display relative -mt-[0.55em] text-4xl leading-[1.04] font-bold tracking-tight text-balance sm:text-5xl lg:text-5xl">
 					Paste markdown.<br />Share a clean link.
 				</h1>
 				<p class="mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
@@ -237,9 +238,10 @@
 				<button
 					type="button"
 					onclick={focusEditor}
-					class="btn-accent inline-flex items-center justify-center px-6 py-2.5 text-[15px] font-semibold transition"
+					class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
 				>
 					Start writing
+					<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
 				</button>
 			</div>
 			<div class="rise rise-2 min-w-0">
@@ -267,7 +269,7 @@
 		<!-- right: live editor pane -->
 		<section class="min-w-0 lg:h-full lg:min-h-0 lg:py-6">
 			<div class="paper-stack h-full" data-dragging={dragging}>
-				<div class="flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
+				<div class="machine flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
 					<div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
 						<div role="tablist" aria-label="Input method" class="inline-flex bg-paper p-1 dark:bg-night">
 							<button
@@ -315,7 +317,7 @@
 							ondragleave={() => (dragging = false)}
 							ondrop={onDrop}
 							class="shrink-0 cursor-pointer border border-dashed px-4 py-4 text-center transition {dragging
-								? 'border-iris bg-iris/[0.04]'
+								? 'border-solid border-iris bg-iris/[0.08]'
 								: 'border-line hover:border-iris dark:border-night-line dark:hover:border-indigo-300'}"
 						>
 							<p class="text-sm font-medium">
@@ -351,7 +353,7 @@
 							maxlength="200"
 							placeholder="e.g. Deploy notes for Friday"
 							autocomplete="off"
-							class="w-full border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+							class="machine-well w-full border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 						/>
 					</label>
 
@@ -364,7 +366,7 @@
 							rows="6"
 							placeholder={tab === 'paste' ? '# Paste it here. Headings, tables, tasks, code.' : '# Type here. Dropping a file fills this in.'}
 							spellcheck="false"
-							class="min-h-0 w-full flex-1 resize-y border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris lg:resize-none dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+							class="machine-well min-h-0 w-full flex-1 resize-y border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris lg:resize-none dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 						></textarea>
 					</label>
 
@@ -476,13 +478,14 @@
 						<button
 							onclick={share}
 							disabled={!canShare}
-							class="btn-accent inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold transition"
+							class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
 						>
 							{#if busy}
 								<span class="size-4 animate-spin border-2 border-current border-t-transparent opacity-60" aria-hidden="true"></span>
 								Sharing…
 							{:else}
 								Share
+								<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
 							{/if}
 						</button>
 					</div>

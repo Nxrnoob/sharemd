@@ -218,6 +218,44 @@ body {
 	cursor: not-allowed;
 }
 
+/* ---------- landing signature: ghost outline word ----------
+   Display voice, transparent fill, hairline stroke from theme ink.
+   Decorative only (aria-hidden in markup). Theme-driven, radius-free. */
+.ghost-word {
+	font-family: var(--font-display);
+	font-weight: 700;
+	color: transparent;
+	-webkit-text-stroke: 1px color-mix(in srgb, var(--color-ink) 24%, transparent);
+	user-select: none;
+}
+
+/* ---------- machined hardware: sharp nested enclosures ----------
+   Flat accent only; depth comes from hairline borders plus one inner
+   top highlight. No glow, no blur, radius 0 per the shape lock. */
+.machine {
+	box-shadow: inset 0 1px 0 0 color-mix(in srgb, #ffffff 9%, transparent);
+}
+.machine-well {
+	box-shadow: inset 0 1px 2px 0 rgb(0 0 0 / 0.32);
+}
+
+/* ---------- magnetic buttons: group hover, press-down, custom curve ----------
+   Trailing glyph translates on group-hover; press uses active:scale.
+   Transform/opacity only; collapsed under reduced-motion below. */
+.btn-mag {
+	transition:
+		transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+		background-color 0.18s ease,
+		border-color 0.18s ease,
+		color 0.18s ease;
+}
+.btn-mag:hover {
+	transform: translateY(-1px);
+}
+.btn-mag:active {
+	transform: translateY(0);
+}
+
 /* ---------- landing: single viewport, no page scroll on desktop ---------- */
 @media (min-width: 1024px) {
 	.landing-lock {
@@ -452,6 +490,9 @@ pre:has(> code.shiki) code {
 	.rise,
 	.toast-in {
 		animation: none;
+	}
+	.btn-mag:hover {
+		transform: none;
 	}
 	/* Hide-on-scroll header snaps instantly instead of sliding. */
 	.site-header {
