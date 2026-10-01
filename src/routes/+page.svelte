@@ -26,8 +26,14 @@
 	let slug = $state('');
 	let optPassword = $state('');
 	let expiry = $state('0');
-	let maxViews = $state('');
-	const slugClean = $derived(slug.trim().toLowerCase());
+	// NOTE: type="number" binds null when the field is empty, so every use
+	// below goes through str() first. Never call .trim() on raw state.
+	let maxViews: string | number | null = $state('');
+	/** Normalize bound input values: number inputs bind null when empty. */
+	function str(v: unknown): string {
+		return typeof v === 'string' ? v : v == null ? '' : String(v);
+	}
+	const slugClean = $derived(str(slug).trim().toLowerCase());
 	const slugOk = $derived(/^[a-z0-9-]{3,32}$/.test(slugClean));
 
 	const bytes = $derived(new TextEncoder().encode(markdown).length);
@@ -87,8 +93,10 @@
 	}
 
 	async function share() {
-		const finalTitle = title.trim() || autoTitleFromMarkdown() || 'Untitled';
-		if (!markdown.trim()) {
+		const titleStr = str(title);
+		const mdStr = str(markdown);
+		const finalTitle = titleStr.trim() || autoTitleFromMarkdown() || 'Untitled';
+		if (!mdStr.trim()) {
 			showToast('Add some markdown first. Paste text or drop a .md file.', 'error');
 			return;
 		}
@@ -96,18 +104,20 @@
 			showToast('That doc is over 512KB. Trim it down, then share again.', 'error');
 			return;
 		}
-		const cleanSlug = slug.trim().toLowerCase();
+		const cleanSlug = str(slug).trim().toLowerCase();
 		if (cleanSlug && !/^[a-z0-9-]{3,32}$/.test(cleanSlug)) {
 			showToast('Slugs use a-z, 0-9 and dashes, 3 to 32 long. Fix it and try again.', 'error');
 			return;
 		}
-		if (optPassword && optPassword.length < 4) {
+		const pwStr = str(optPassword);
+		if (pwStr && pwStr.length < 4) {
 			showToast('Passwords need at least 4 characters. Fix it and try again.', 'error');
 			return;
 		}
 		const expirySecs = expiry === '0' ? 0 : parseInt(expiry, 10);
-		const maxV = maxViews.trim() === '' ? 0 : Number(maxViews);
-		if (maxViews.trim() !== '' && (!Number.isInteger(maxV) || maxV < 1)) {
+		const maxViewsStr = str(maxViews);
+		const maxV = maxViewsStr === '' ? 0 : Number(maxViewsStr);
+		if (maxViewsStr !== '' && (!Number.isInteger(maxV) || maxV < 1)) {
 			showToast('Max views must be 1 or more, or leave it empty.', 'error');
 			return;
 		}
@@ -118,21 +128,22 @@
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({
 					title: finalTitle.slice(0, 200),
-					markdown,
+					markdown: mdStr,
 					...(cleanSlug ? { slug: cleanSlug } : {}),
-					...(optPassword ? { password: optPassword } : {}),
+					...(pwStr ? { password: pwStr } : {}),
 					...(expirySecs ? { expiresInSec: expirySecs } : {}),
 					...(maxV ? { maxViews: maxV } : {})
 				})
 			});
-			const out = (await res.json().catch(() => ({}))) as { id?: string; url?: string; error?: string };
-			if (!res.ok || !out.id) {
-				showToast(friendlyError(res.status, out.error), 'error');
+			const raw = (await res.json().catch(() => ({}))) as unknown;
+			const out = raw && typeof raw === 'object' ? (raw as { id?: string; url?: string; error?: string }) : {};
+			if (!res.ok || typeof out.id !== 'string' || !out.id) {
+				showToast(friendlyError(res.status, typeof out.error === 'string' ? out.error : undefined), 'error');
 				return;
 			}
 			const saved = typeof document !== 'undefined' ? document.documentElement.dataset.theme : null;
 			const themeId: ThemeId = isThemeId(saved) ? saved : DEFAULT_THEME_ID;
-			const url = buildThemedUrl(out.url ?? `/s/${out.id}`, themeId);
+			const url = buildThemedUrl(typeof out.url === 'string' && out.url ? out.url : `/s/${out.id}`, themeId);
 			if (await copyText(new URL(url, location.origin).href)) {
 				showToast('Shared. Link copied. Paste it anywhere.', 'ok', url);
 			} else {
