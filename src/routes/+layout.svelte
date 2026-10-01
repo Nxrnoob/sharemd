@@ -44,7 +44,7 @@
 	>
 		<div class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4 sm:px-6">
 			<a href="/" class="flex items-center" aria-label="ShareMD home">
-				<span class="font-display text-[16px] tracking-tight"><span class="font-medium">share</span><span
+				<span class="font-display text-[17px] font-semibold"><span class="font-medium">share</span><span
 						class="font-bold">MD</span></span
 				>
 			</a>

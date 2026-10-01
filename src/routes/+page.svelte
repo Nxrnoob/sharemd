@@ -218,7 +218,7 @@
 	<div class="grid gap-8 lg:h-full lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12">
 		<!-- left: brand + headline + cta + recent -->
 		<section class="flex min-w-0 flex-col justify-center gap-5 lg:h-full lg:overflow-hidden">
-			<div class="rise font-display text-[15px] tracking-tight" aria-hidden="true">
+			<div class="rise font-display text-[17px] font-semibold" aria-hidden="true">
 				<span class="font-medium">share</span><span class="font-bold">MD</span>
 			</div>
 			<div class="rise rise-1 min-w-0">
