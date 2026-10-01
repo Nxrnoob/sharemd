@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import Toast from '$lib/components/Toast.svelte';
+	import AmbientCanvas from '$lib/components/AmbientCanvas.svelte';
 	import { copyText } from '$lib/clipboard';
 	import { buildThemedUrl, isThemeId, DEFAULT_THEME_ID } from '$lib/themes';
 	import type { ThemeId } from '$lib/themes';
@@ -213,6 +214,8 @@
 		if (e.key === 'Escape' && optionsOpen) closeOptions();
 	}}
 />
+
+<AmbientCanvas />
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
 	<div class="grid gap-8 lg:h-full lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12">
