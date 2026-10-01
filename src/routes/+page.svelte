@@ -218,8 +218,8 @@
 	<div class="grid gap-8 lg:h-full lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12">
 		<!-- left: brand + headline + cta + recent -->
 		<section class="flex min-w-0 flex-col justify-center gap-5 lg:h-full lg:overflow-hidden">
-			<div class="rise font-display text-[15px] font-bold tracking-tight" aria-hidden="true">
-				ShareMD<span aria-hidden="true" class="ml-[2px] inline-block h-[0.14em] w-[0.55em] bg-iris"></span>
+			<div class="rise font-display text-[15px] tracking-tight" aria-hidden="true">
+				<span class="font-medium">share</span><span class="font-bold">MD</span>
 			</div>
 			<div class="rise rise-1 min-w-0">
 				<p class="font-mono relative text-xs tracking-widest text-ink-soft uppercase dark:text-slate-400">
@@ -227,10 +227,10 @@
 				</p>
 				<span aria-hidden="true" class="ghost-word relative mt-2 block text-[clamp(2.75rem,10vw,4.5rem)] leading-[0.9] tracking-tight">PASTE</span>
 				<h1 class="font-display relative -mt-[0.55em] text-4xl leading-[1.04] font-bold tracking-tight text-balance sm:text-5xl lg:text-5xl">
-					Paste markdown.<br />Share a clean link.
+					Paste the md your AI gave you.<br />Read it beautifully.
 				</h1>
 				<p class="mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
-					Drop a .md file or paste text. Get an unlisted page with clean code highlighting.
+					Drop a .md file or paste text. Get an unlisted link that reads well.
 				</p>
 			</div>
 			<div class="rise rise-2">
@@ -239,7 +239,7 @@
 					onclick={focusEditor}
 					class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
 				>
-					Start writing
+					Start pasting
 					<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
 				</button>
 			</div>
