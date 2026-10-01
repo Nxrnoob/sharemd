@@ -21,6 +21,15 @@
 	let textareaEl: HTMLTextAreaElement | null = $state(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
+	// Link options (sent only when set; backend ignores unknowns until its lane lands).
+	let optionsOpen = $state(false);
+	let slug = $state('');
+	let optPassword = $state('');
+	let expiry = $state('0');
+	let maxViews = $state('');
+	const slugClean = $derived(slug.trim().toLowerCase());
+	const slugOk = $derived(/^[a-z0-9-]{3,32}$/.test(slugClean));
+
 	const bytes = $derived(new TextEncoder().encode(markdown).length);
 	const overLimit = $derived(bytes > MAX_BYTES);
 	const kb = $derived((bytes / 1024).toFixed(bytes < 10240 ? 1 : 0));
@@ -87,12 +96,34 @@
 			showToast('That doc is over 512KB. Trim it down, then share again.', 'error');
 			return;
 		}
+		const cleanSlug = slug.trim().toLowerCase();
+		if (cleanSlug && !/^[a-z0-9-]{3,32}$/.test(cleanSlug)) {
+			showToast('Slugs use a-z, 0-9 and dashes, 3 to 32 long. Fix it and try again.', 'error');
+			return;
+		}
+		if (optPassword && optPassword.length < 4) {
+			showToast('Passwords need at least 4 characters. Fix it and try again.', 'error');
+			return;
+		}
+		const expirySecs = expiry === '0' ? 0 : parseInt(expiry, 10);
+		const maxV = maxViews.trim() === '' ? 0 : Number(maxViews);
+		if (maxViews.trim() !== '' && (!Number.isInteger(maxV) || maxV < 1)) {
+			showToast('Max views must be 1 or more, or leave it empty.', 'error');
+			return;
+		}
 		busy = true;
 		try {
 			const res = await fetch('/api/docs', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ title: finalTitle.slice(0, 200), markdown })
+				body: JSON.stringify({
+					title: finalTitle.slice(0, 200),
+					markdown,
+					...(cleanSlug ? { slug: cleanSlug } : {}),
+					...(optPassword ? { password: optPassword } : {}),
+					...(expirySecs ? { expiresInSec: expirySecs } : {}),
+					...(maxV ? { maxViews: maxV } : {})
+				})
 			});
 			const out = (await res.json().catch(() => ({}))) as { id?: string; url?: string; error?: string };
 			if (!res.ok || !out.id) {
@@ -101,7 +132,7 @@
 			}
 			const saved = typeof document !== 'undefined' ? document.documentElement.dataset.theme : null;
 			const themeId: ThemeId = isThemeId(saved) ? saved : DEFAULT_THEME_ID;
-			const url = buildThemedUrl(`/s/${out.id}`, themeId);
+			const url = buildThemedUrl(out.url ?? `/s/${out.id}`, themeId);
 			if (await copyText(new URL(url, location.origin).href)) {
 				showToast('Shared. Link copied. Paste it anywhere.', 'ok', url);
 			} else {
@@ -123,8 +154,30 @@
 	function friendlyError(status: number, serverMsg?: string): string {
 		if (status === 413) return 'That doc is over 512KB. Trim it down, then share again.';
 		if (status === 429) return 'Too many shares from this address. Wait a bit, then retry.';
+		if (status === 409 || /taken|already exists|in use|conflict/i.test(serverMsg ?? '')) {
+			return 'That slug is taken, try another.';
+		}
+		if (/slug/i.test(serverMsg ?? '')) {
+			return 'That slug will not work. Use a-z, 0-9 and dashes, 3 to 32 long.';
+		}
 		if (serverMsg?.includes('non-empty')) return 'Add a title and some markdown, then share.';
 		return serverMsg ? `Share failed: ${serverMsg}. Fix that and retry.` : 'Share failed. Try again.';
+	}
+
+	async function copySlugPreview() {
+		if (!slugOk) return;
+		const saved = typeof document !== 'undefined' ? document.documentElement.dataset.theme : null;
+		const themeId: ThemeId = isThemeId(saved) ? saved : DEFAULT_THEME_ID;
+		const preview = buildThemedUrl(`/s/${slugClean}`, themeId);
+		if (await copyText(new URL(preview, location.origin).href)) {
+			showToast('Slug link copied.', 'ok', preview);
+		} else {
+			showToast('Copy failed. Select the slug text and copy it by hand.', 'error');
+		}
+	}
+
+	function closeOptions() {
+		optionsOpen = false;
 	}
 
 	function timeAgo(ts: number): string {
@@ -143,6 +196,12 @@
 	<title>ShareMD: paste markdown, share a clean page</title>
 	<meta name="description" content="Paste markdown or drop a .md file. Get an unlisted link that reads beautifully." />
 </svelte:head>
+
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === 'Escape' && optionsOpen) closeOptions();
+	}}
+/>
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
 	<div class="grid gap-8 lg:h-full lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12">
@@ -313,6 +372,96 @@
 								{/if}
 							</p>
 						</div>
+					<div class="relative flex shrink-0 items-center gap-2">
+						<button
+							type="button"
+							onclick={() => (optionsOpen = !optionsOpen)}
+							aria-expanded={optionsOpen}
+							aria-haspopup="dialog"
+							class="inline-flex items-center justify-center rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-ink dark:border-night-line dark:text-slate-400 dark:hover:text-white"
+						>
+							Link options
+						</button>
+						{#if optionsOpen}
+							<div
+								class="fixed inset-0 z-40 cursor-default"
+								onclick={closeOptions}
+								aria-hidden="true"
+							></div>
+							<div
+								role="dialog"
+								aria-label="Link options"
+								class="absolute right-0 bottom-full z-50 mb-2 max-h-[60dvh] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-xl dark:border-night-line dark:bg-night-surface"
+							>
+								<label class="block">
+									<span class="mb-1.5 block text-sm font-medium">Custom slug</span>
+									<input
+										bind:value={slug}
+										maxlength="32"
+										placeholder="my-doc-name"
+										autocomplete="off"
+										spellcheck="false"
+										class="w-full rounded-xl border border-line bg-paper px-3 py-2 font-mono text-[13px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+									/>
+									<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">a-z, 0-9 and dashes, 3 to 32 long.</span>
+								</label>
+								{#if slugOk}
+									<button
+										type="button"
+										onclick={copySlugPreview}
+										title="Copy slug link"
+										class="mt-2 block w-full truncate rounded-lg bg-paper px-2.5 py-1.5 text-left font-mono text-xs text-iris hover:underline dark:bg-night dark:text-indigo-300"
+									>
+										/s/{slugClean} ⧉
+									</button>
+								{/if}
+								<label class="mt-3 block">
+									<span class="mb-1.5 block text-sm font-medium">Password</span>
+									<input
+										type="password"
+										bind:value={optPassword}
+										placeholder="Optional"
+										autocomplete="new-password"
+										class="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+									/>
+									<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">Min 4 characters. Readers type this to open the link.</span>
+								</label>
+								<div class="mt-3 grid grid-cols-2 gap-3">
+									<label class="block">
+										<span class="mb-1.5 block text-sm font-medium">Expires</span>
+										<select
+											bind:value={expiry}
+											class="w-full rounded-xl border border-line bg-paper px-2.5 py-2 text-sm focus:border-iris dark:border-night-line dark:bg-night"
+										>
+											<option value="0">Never</option>
+											<option value="3600">1 hour</option>
+											<option value="86400">1 day</option>
+											<option value="604800">7 days</option>
+											<option value="2592000">30 days</option>
+										</select>
+									</label>
+									<label class="block">
+										<span class="mb-1.5 block text-sm font-medium">Max views</span>
+										<input
+											type="number"
+											inputmode="numeric"
+											min="1"
+											step="1"
+											bind:value={maxViews}
+											placeholder="Unlimited"
+											class="w-full rounded-xl border border-line bg-paper px-2.5 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+										/>
+									</label>
+								</div>
+								<button
+									type="button"
+									onclick={closeOptions}
+									class="btn-accent mt-4 w-full rounded-xl px-4 py-2 text-sm font-semibold transition"
+								>
+									Done
+								</button>
+							</div>
+						{/if}
 						<button
 							onclick={share}
 							disabled={!canShare}
@@ -325,6 +474,7 @@
 								Share
 							{/if}
 						</button>
+					</div>
 					</div>
 					<p class="mt-2 shrink-0 text-center font-mono text-[11px] text-ink-soft sm:text-left dark:text-slate-500">
 						Link carries your current theme.

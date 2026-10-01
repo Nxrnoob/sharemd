@@ -8,6 +8,13 @@
       "when": 1790687253074,
       "tag": "0000_even_silk_fever",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790821441821,
+      "tag": "0001_aspiring_giant_man",
+      "breakpoints": true
     }
   ]
 }

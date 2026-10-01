@@ -28,9 +28,23 @@ marked.use({
 	async walkTokens(token) {
 		if (token.type === 'code') {
 			const codeToken = token as { text: string; lang?: string };
+			const lang = (codeToken.lang || '').toLowerCase();
+			if (lang === 'mermaid') {
+				// Designer-lane contract: emit raw text for client-side mermaid rendering.
+				// Skip Shiki; DOMPurify (below) keeps class on pre/code.
+				const escaped = codeToken.text
+					.replace(/&/g, '&amp;')
+					.replace(/</g, '&lt;')
+					.replace(/>/g, '&gt;');
+				codeToken.text =
+					`<pre class="mermaid-block"><code>${escaped}</code></pre>`;
+				(token as { type: string; pre?: boolean; text: string }).type =
+					'html' as never;
+				(token as { pre?: boolean }).pre = true;
+				return;
+			}
 			try {
 				const hl = await getHighlighter();
-				const lang = (codeToken.lang || 'plaintext').toLowerCase();
 				const loaded = hl.getLoadedLanguages();
 				const useLang = loaded.includes(lang) ? lang : 'plaintext';
 				codeToken.text = hl.codeToHtml(codeToken.text, {

@@ -6,7 +6,11 @@ export const documents = sqliteTable('documents', {
 	rawMarkdown: text('raw_markdown').notNull(),
 	html: text('html').notNull(),
 	createdAt: integer('created_at').notNull(),
-	views: integer('views').notNull().default(0)
+	views: integer('views').notNull().default(0),
+	slug: text('slug').unique(),
+	passwordHash: text('password_hash'),
+	expiresAt: integer('expires_at'),
+	maxViews: integer('max_views')
 });
 
 export type Document = typeof documents.$inferSelect;

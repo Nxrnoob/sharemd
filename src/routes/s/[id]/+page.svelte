@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { codeCopy } from '$lib/actions/codeCopy';
 	import { copyText } from '$lib/clipboard';
 	import Toast from '$lib/components/Toast.svelte';
@@ -7,6 +9,7 @@
 	import TocFloating from '$lib/components/TocFloating.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
 	import ReadingProgress from '$lib/components/ReadingProgress.svelte';
+	import Mermaid from '$lib/components/Mermaid.svelte';
 	import {
 		buildThemedUrl,
 		getThemeFromUrl,
@@ -27,6 +30,20 @@
 	// Theme actually on screen (link override or viewer pick). Buttons always
 	// share what is on screen.
 	let screenTheme = $state<ThemeId>(DEFAULT_THEME_ID);
+	// Password gate state. Backend may return { passwordRequired: true } with
+	// no content, or { gone: true } for expired/used-up links.
+	let pwInput = $state('');
+	let pwBusy = $state(false);
+	let pwError = $state<string | null>(null);
+	let unlockTried = $state(false);
+
+	type LoadFlags = { passwordRequired?: boolean; gone?: boolean };
+	const flags = $derived((data ?? {}) as typeof data & LoadFlags);
+	const isGone = $derived(flags.gone === true);
+	const isGated = $derived(!isGone && flags.passwordRequired === true);
+	const gateError = $derived(
+		pwError ?? (unlockTried && isGated ? 'Wrong password. Try again.' : null)
+	);
 
 	const themedPath = $derived(buildThemedUrl(`/s/${data.id}`, screenTheme));
 	const themedRawPath = $derived(buildThemedUrl(`/s/${data.id}/raw`, screenTheme));
@@ -75,6 +92,24 @@
 			setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 		} catch {
 			flash('Download failed. Try the raw link instead.');
+		}
+	}
+
+	async function unlock() {
+		pwError = null;
+		if (!pwInput.trim()) {
+			pwError = 'Type the password first.';
+			return;
+		}
+		unlockTried = true;
+		pwBusy = true;
+		try {
+			// Keep ?theme= (and anything else) while adding ?pw=.
+			const params = new URLSearchParams(page.url.search);
+			params.set('pw', pwInput);
+			await goto(`${page.url.pathname}?${params.toString()}`, { invalidateAll: true });
+		} finally {
+			pwBusy = false;
 		}
 	}
 
@@ -128,7 +163,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.title} · ShareMD</title>
+	<title>{data.title ?? 'Shared doc'} · ShareMD</title>
 	<meta name="description" content={plainDescription} />
 	<meta property="og:title" content={data.title} />
 	<meta property="og:description" content={plainDescription} />
@@ -138,6 +173,72 @@
 	<meta name="twitter:description" content={plainDescription} />
 </svelte:head>
 
+{#if isGone}
+	<!-- expired or views exhausted: no content, friendly way out -->
+	<main class="mx-auto grid w-full max-w-xl flex-1 place-items-center px-4 py-16 sm:px-6">
+		<div class="rise w-full rounded-2xl border border-line bg-surface p-6 text-center sm:p-8 dark:border-night-line dark:bg-night-surface">
+			<p class="font-mono text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Link done</p>
+			<h1 class="font-display mt-3 text-2xl font-bold tracking-tight">This link expired or hit its view limit.</h1>
+			<p class="mt-3 text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
+				Ask the sender for a fresh one, or share a doc of your own.
+			</p>
+			<a
+				href="/"
+				class="btn-accent mt-6 inline-flex items-center justify-center rounded-xl px-6 py-2.5 text-[15px] font-semibold transition"
+			>
+				Share a new doc
+			</a>
+		</div>
+	</main>
+{:else if isGated}
+	<!-- password gate: no content until unlocked -->
+	<main class="mx-auto grid w-full max-w-xl flex-1 place-items-center px-4 py-16 sm:px-6">
+		<div class="rise w-full rounded-2xl border border-line bg-surface p-6 sm:p-8 dark:border-night-line dark:bg-night-surface">
+			<p class="font-mono text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Protected link</p>
+			<h1 class="font-display mt-3 text-2xl font-bold tracking-tight">This link is locked.</h1>
+			<p class="mt-3 text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
+				Type the password to open it. Ask the sender if you do not have it.
+			</p>
+			<form
+				onsubmit={(e) => {
+					e.preventDefault();
+					unlock();
+				}}
+				class="mt-5"
+			>
+				<label class="block">
+					<span class="mb-1.5 block text-sm font-medium">Password</span>
+					<input
+						type="password"
+						bind:value={pwInput}
+						oninput={() => {
+							pwError = null;
+							unlockTried = false;
+						}}
+						placeholder="Link password"
+						autocomplete="off"
+						class="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+					/>
+				</label>
+				{#if gateError}
+					<p role="alert" class="mt-2 text-sm font-medium text-red-600 dark:text-red-300">{gateError}</p>
+				{/if}
+				<button
+					type="submit"
+					disabled={pwBusy}
+					class="btn-accent mt-4 inline-flex w-full items-center justify-center rounded-xl px-6 py-2.5 text-[15px] font-semibold transition"
+				>
+					{#if pwBusy}
+						<span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60" aria-hidden="true"></span>
+						Unlocking…
+					{:else}
+						Unlock
+					{/if}
+				</button>
+			</form>
+		</div>
+	</main>
+{:else}
 <ReadingProgress getTarget={() => articleEl} />
 
 <!-- top bar -->
@@ -216,7 +317,9 @@
 		</div>
 		<TocRail items={toc} activeId={activeId} />
 	</div>
+	<Mermaid article={articleEl} />
 </main>
+{/if}
 
 <Toast message={toast} />
 <TocFloating items={toc} activeId={activeId} />
