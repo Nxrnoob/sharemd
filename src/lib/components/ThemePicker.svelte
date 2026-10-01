@@ -98,14 +98,14 @@
 		aria-expanded={open}
 		aria-label="Editor theme, current: {active.label}"
 		title="Editor theme"
-		class="flex h-9 items-center gap-2 rounded-xl border border-line bg-surface px-2.5 text-[13px] font-medium transition hover:border-iris"
+		class="flex h-9 items-center gap-2 border border-line bg-surface px-2.5 text-[13px] font-medium transition hover:border-iris"
 	>
 		<span
-			class="grid size-4 shrink-0 place-items-center rounded-full border"
+			class="grid size-4 shrink-0 place-items-center rounded-none border"
 			style="background: {active.tokens.bg}; border-color: {active.tokens.border}"
 			aria-hidden="true"
 		>
-			<span class="size-1.5 rounded-full" style="background: {active.tokens.accent}" aria-hidden="true"></span>
+			<span class="size-1.5 rounded-none" style="background: {active.tokens.accent}" aria-hidden="true"></span>
 		</span>
 		<span class="hidden max-w-28 truncate sm:inline">{active.label}</span>
 		<span aria-hidden="true" class="text-[11px] opacity-60">▾</span>
@@ -118,7 +118,7 @@
 			tabindex="-1"
 			aria-label="Editor theme"
 			onkeydown={onMenuKey}
-			class="absolute top-10 right-0 z-50 w-56 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl"
+			class="absolute top-10 right-0 z-50 w-56 overflow-hidden border border-line bg-surface p-1 shadow-xl"
 		>
 			{#each themes as t, i (t.id)}
 				<button
@@ -128,16 +128,16 @@
 					tabindex={i === activeIndex ? 0 : -1}
 					onclick={() => pick(t.id)}
 					onmouseenter={() => (activeIndex = i)}
-					class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition {t.id === current
+					class="flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-[13px] transition {t.id === current
 						? 'bg-iris/10 font-medium'
 						: 'hover:bg-black/5 dark:hover:bg-white/5'}"
 				>
 					<span
-						class="grid size-5 shrink-0 place-items-center rounded-full border"
+						class="grid size-5 shrink-0 place-items-center rounded-none border"
 						style="background: {t.tokens.bg}; border-color: {t.tokens.border}"
 						aria-hidden="true"
 					>
-						<span class="size-2 rounded-full" style="background: {t.tokens.accent}" aria-hidden="true"></span>
+						<span class="size-2 rounded-none" style="background: {t.tokens.accent}" aria-hidden="true"></span>
 					</span>
 					<span class="flex-1 truncate">{t.label}</span>
 					{#if t.id === current}

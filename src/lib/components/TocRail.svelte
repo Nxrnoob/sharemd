@@ -12,9 +12,9 @@
 	<aside class="hidden self-start lg:block" aria-label="Table of contents sidebar">
 		<nav
 			aria-label="Table of contents"
-			class="sticky top-24 max-h-[calc(100vh-7rem)] overflow-auto rounded-2xl border border-line bg-surface p-4 dark:border-night-line dark:bg-night-surface"
+			class="sticky top-24 max-h-[calc(100vh-7rem)] overflow-auto py-1"
 		>
-			<p class="font-mono text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">
+			<p class="font-display text-[13px] font-semibold tracking-tight">
 				On this page
 			</p>
 			<ul class="mt-2 space-y-0.5">
@@ -24,8 +24,8 @@
 							href={`#${item.id}`}
 							aria-current={activeId === item.id ? 'true' : undefined}
 							class="block truncate border-l-2 py-1 pl-3 text-[13px] transition {activeId === item.id
-								? 'border-iris font-medium text-iris'
-								: 'border-line text-ink-soft hover:border-iris/60 hover:text-ink dark:border-night-line dark:text-slate-400 dark:hover:text-slate-100'}"
+								? 'font-display border-iris font-semibold text-iris'
+								: 'border-transparent text-ink-soft hover:border-iris/60 hover:text-ink dark:text-slate-400 dark:hover:text-slate-100'}"
 							>{item.text}</a
 						>
 					</li>

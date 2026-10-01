@@ -9,6 +9,10 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
+/* shape: all-sharp, radius 0 everywhere. No rounded corners on buttons,
+   inputs, cards, popovers, dropzones, code blocks, toasts, TOC chrome.
+   The lock rule at the bottom of this file enforces it app-wide. */
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -226,7 +230,7 @@ body {
 :where(a, button, input, textarea, [tabindex]):focus-visible {
 	outline: 2px solid var(--color-iris);
 	outline-offset: 2px;
-	border-radius: 6px;
+	border-radius: 0;
 }
 .dark :where(a, button, input, textarea, [tabindex]):focus-visible {
 	outline-color: #a5b4fc;
@@ -242,7 +246,7 @@ body {
 	content: '';
 	position: absolute;
 	inset: 0;
-	border-radius: 16px;
+	border-radius: 0;
 	border: 1px solid var(--color-line);
 	background: var(--color-surface);
 	z-index: -2;
@@ -295,7 +299,7 @@ body {
 	white-space: nowrap;
 }
 .prose-share :where(img) {
-	border-radius: 12px;
+	border-radius: 0;
 	max-width: 100%;
 	height: auto;
 }
@@ -304,7 +308,7 @@ body {
 	max-width: 100%;
 	overflow-x: auto;
 	overflow-y: hidden;
-	border-radius: 14px;
+	border-radius: 0;
 	white-space: pre;
 	-webkit-overflow-scrolling: touch;
 	scrollbar-width: thin;
@@ -343,7 +347,7 @@ body {
 	font-size: 11px;
 	letter-spacing: 0.04em;
 	padding: 5px 10px;
-	border-radius: 8px;
+	border-radius: 0;
 	border: 1px solid rgba(255, 255, 255, 0.18);
 	background: rgba(255, 255, 255, 0.08);
 	color: #e8eaf4;
@@ -460,4 +464,11 @@ pre:has(> code.shiki) code {
 	.paper-stack::after {
 		transition: none;
 	}
+}
+
+/* ---------- shape lock: all-sharp, radius 0 everywhere ----------
+   Final say on corners. Any rounded-* utility or radius left in a
+   component is flattened here so the system cannot drift. */
+*, *::before, *::after {
+	border-radius: 0 !important;
 }

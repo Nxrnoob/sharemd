@@ -61,9 +61,9 @@
 				bind:this={panel}
 				role="dialog"
 				aria-label="Table of contents"
-				class="toast-in mb-3 max-h-[50vh] w-[calc(100vw-2rem)] max-w-xs overflow-auto rounded-2xl border border-line bg-surface p-3 shadow-xl dark:border-night-line dark:bg-night-surface"
+				class="toast-in mb-3 max-h-[50vh] w-[calc(100vw-2rem)] max-w-xs overflow-auto border border-line bg-surface p-3 shadow-xl dark:border-night-line dark:bg-night-surface"
 			>
-				<p class="px-1 font-mono text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">
+				<p class="font-display px-1 text-[13px] font-semibold tracking-tight">
 					On this page
 				</p>
 				<ul class="mt-1.5 space-y-0.5">
@@ -74,8 +74,8 @@
 								onclick={() => setOpen(false)}
 								aria-current={activeId === item.id ? 'true' : undefined}
 								class="block truncate border-l-2 py-1 pl-3 text-[13px] transition {activeId === item.id
-									? 'border-iris font-medium text-iris'
-									: 'border-line text-ink-soft hover:border-iris/60 hover:text-ink dark:border-night-line dark:text-slate-400 dark:hover:text-slate-100'}"
+									? 'font-display border-iris font-semibold text-iris'
+									: 'border-transparent text-ink-soft hover:border-iris/60 hover:text-ink dark:text-slate-400 dark:hover:text-slate-100'}"
 								>{item.text}</a
 							>
 						</li>
@@ -90,10 +90,10 @@
 			aria-haspopup="dialog"
 			aria-expanded={open}
 			aria-label={current ? `Table of contents, current section: ${current.text}` : 'Table of contents'}
-			class="flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full border border-line bg-surface/95 py-2 pr-4 pl-3 shadow-lg backdrop-blur transition hover:border-iris sm:max-w-xs dark:border-night-line dark:bg-night-surface/95"
+			class="flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-none border border-line bg-surface/95 py-2 pr-4 pl-3 shadow-lg backdrop-blur transition hover:border-iris sm:max-w-xs dark:border-night-line dark:bg-night-surface/95"
 		>
-			<span aria-hidden="true" class="shrink-0 font-mono text-[13px] text-iris">≡</span>
-			<span class="truncate text-[13px] font-medium">{current?.text ?? 'Contents'}</span>
+			<span aria-hidden="true" class="font-display shrink-0 text-[15px] font-semibold text-iris">≡</span>
+			<span class="font-display truncate text-[13px] font-medium">{current?.text ?? 'Contents'}</span>
 		</button>
 	</div>
 {/if}

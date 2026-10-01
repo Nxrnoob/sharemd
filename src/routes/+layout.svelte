@@ -45,7 +45,7 @@
 		<div class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4 sm:px-6">
 			<a href="/" class="flex items-center gap-2" aria-label="ShareMD home">
 				<span
-					class="grid size-7 place-items-center rounded-lg bg-ink font-mono text-xs font-medium text-white dark:bg-surface dark:text-ink"
+					class="grid size-7 place-items-center bg-ink font-mono text-xs font-medium text-white dark:bg-surface dark:text-ink"
 					aria-hidden="true">M</span
 				>
 				<span class="font-display text-[16px] font-bold tracking-tight">ShareMD</span>
@@ -53,7 +53,7 @@
 			<div class="flex items-center gap-2">
 				<a
 					href="/"
-					class="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft transition hover:bg-black/5 hover:text-ink dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+					class=" px-3 py-1.5 text-sm font-medium text-ink-soft transition hover:bg-black/5 hover:text-ink dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
 					>New doc</a
 				>
 				<ThemePicker />

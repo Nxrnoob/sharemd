@@ -21,7 +21,7 @@
 		</p>
 		<a
 			href="/"
-			class="mt-6 inline-flex items-center gap-2 rounded-xl bg-iris px-5 py-2.5 font-medium text-white transition hover:bg-iris-deep dark:bg-indigo-500 dark:hover:bg-indigo-400"
+			class="mt-6 inline-flex items-center gap-2 bg-iris px-5 py-2.5 font-medium text-white transition hover:bg-iris-deep dark:bg-indigo-500 dark:hover:bg-indigo-400"
 		>
 			Share a new doc →
 		</a>

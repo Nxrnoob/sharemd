@@ -219,7 +219,7 @@
 		<!-- left: brand + headline + cta + recent -->
 		<section class="flex min-w-0 flex-col justify-center gap-5 lg:h-full lg:overflow-hidden">
 			<div class="rise flex items-center gap-2" aria-hidden="true">
-				<span class="grid size-7 place-items-center rounded-lg bg-ink font-mono text-xs font-medium text-white dark:bg-surface dark:text-ink">M</span>
+				<span class="grid size-7 place-items-center bg-ink font-mono text-xs font-medium text-white dark:bg-surface dark:text-ink">M</span>
 				<span class="font-display text-[15px] font-bold tracking-tight">ShareMD</span>
 			</div>
 			<div class="rise rise-1">
@@ -237,7 +237,7 @@
 				<button
 					type="button"
 					onclick={focusEditor}
-					class="btn-accent inline-flex items-center justify-center rounded-xl px-6 py-2.5 text-[15px] font-semibold transition"
+					class="btn-accent inline-flex items-center justify-center px-6 py-2.5 text-[15px] font-semibold transition"
 				>
 					Start writing
 				</button>
@@ -245,7 +245,7 @@
 			<div class="rise rise-2 min-w-0">
 				<h2 class="font-mono text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
 				{#if recentTop.length}
-					<ul class="mt-2 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
+					<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
 						{#each recentTop as doc (doc.id)}
 							<li>
 								<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
@@ -267,14 +267,14 @@
 		<!-- right: live editor pane -->
 		<section class="min-w-0 lg:h-full lg:min-h-0 lg:py-6">
 			<div class="paper-stack h-full" data-dragging={dragging}>
-				<div class="flex h-full min-h-0 flex-col gap-4 rounded-2xl border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
+				<div class="flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
 					<div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
-						<div role="tablist" aria-label="Input method" class="inline-flex rounded-xl bg-paper p-1 dark:bg-night">
+						<div role="tablist" aria-label="Input method" class="inline-flex bg-paper p-1 dark:bg-night">
 							<button
 								role="tab"
 								aria-selected={tab === 'upload'}
 								onclick={() => (tab = 'upload')}
-								class="rounded-lg px-4 py-1.5 text-sm font-medium transition {tab === 'upload'
+								class=" px-4 py-1.5 text-sm font-medium transition {tab === 'upload'
 									? 'bg-surface text-ink shadow-sm dark:bg-night-surface dark:text-white'
 									: 'text-ink-soft hover:text-ink dark:text-slate-400 dark:hover:text-white'}"
 							>
@@ -284,7 +284,7 @@
 								role="tab"
 								aria-selected={tab === 'paste'}
 								onclick={() => (tab = 'paste')}
-								class="rounded-lg px-4 py-1.5 text-sm font-medium transition {tab === 'paste'
+								class=" px-4 py-1.5 text-sm font-medium transition {tab === 'paste'
 									? 'bg-surface text-ink shadow-sm dark:bg-night-surface dark:text-white'
 									: 'text-ink-soft hover:text-ink dark:text-slate-400 dark:hover:text-white'}"
 							>
@@ -314,7 +314,7 @@
 							}}
 							ondragleave={() => (dragging = false)}
 							ondrop={onDrop}
-							class="shrink-0 cursor-pointer rounded-xl border border-dashed px-4 py-4 text-center transition {dragging
+							class="shrink-0 cursor-pointer border border-dashed px-4 py-4 text-center transition {dragging
 								? 'border-iris bg-iris/[0.04]'
 								: 'border-line hover:border-iris dark:border-night-line dark:hover:border-indigo-300'}"
 						>
@@ -351,7 +351,7 @@
 							maxlength="200"
 							placeholder="e.g. Deploy notes for Friday"
 							autocomplete="off"
-							class="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+							class="w-full border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 						/>
 					</label>
 
@@ -364,14 +364,14 @@
 							rows="6"
 							placeholder={tab === 'paste' ? '# Paste it here. Headings, tables, tasks, code.' : '# Type here. Dropping a file fills this in.'}
 							spellcheck="false"
-							class="min-h-0 w-full flex-1 resize-y rounded-xl border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris lg:resize-none dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+							class="min-h-0 w-full flex-1 resize-y border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris lg:resize-none dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 						></textarea>
 					</label>
 
 					<div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
 						<div class="min-w-0 flex-1">
-							<div class="h-1.5 overflow-hidden rounded-full bg-black/8 dark:bg-white/10" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="Size versus 512KB limit">
-								<div class="h-full rounded-full transition-all {overLimit ? 'bg-red-500' : 'bg-iris'}" style="width: {pct}%"></div>
+							<div class="h-1.5 overflow-hidden bg-black/8 dark:bg-white/10" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="Size versus 512KB limit">
+								<div class="h-full transition-all {overLimit ? 'bg-red-500' : 'bg-iris'}" style="width: {pct}%"></div>
 							</div>
 							<p class="mt-1.5 text-xs {overLimit ? 'font-medium text-red-600 dark:text-red-300' : 'text-ink-soft dark:text-slate-500'}">
 								{#if overLimit}
@@ -389,7 +389,7 @@
 							onclick={() => (optionsOpen = !optionsOpen)}
 							aria-expanded={optionsOpen}
 							aria-haspopup="dialog"
-							class="inline-flex items-center justify-center rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-ink dark:border-night-line dark:text-slate-400 dark:hover:text-white"
+							class="inline-flex items-center justify-center border border-line px-4 py-2.5 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-ink dark:border-night-line dark:text-slate-400 dark:hover:text-white"
 						>
 							Link options
 						</button>
@@ -402,7 +402,7 @@
 							<div
 								role="dialog"
 								aria-label="Link options"
-								class="absolute right-0 bottom-full z-50 mb-2 max-h-[60dvh] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-xl dark:border-night-line dark:bg-night-surface"
+								class="absolute right-0 bottom-full z-50 mb-2 max-h-[60dvh] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto border border-line bg-surface p-4 shadow-xl dark:border-night-line dark:bg-night-surface"
 							>
 								<label class="block">
 									<span class="mb-1.5 block text-sm font-medium">Custom slug</span>
@@ -412,7 +412,7 @@
 										placeholder="my-doc-name"
 										autocomplete="off"
 										spellcheck="false"
-										class="w-full rounded-xl border border-line bg-paper px-3 py-2 font-mono text-[13px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+										class="w-full border border-line bg-paper px-3 py-2 font-mono text-[13px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 									/>
 									<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">a-z, 0-9 and dashes, 3 to 32 long.</span>
 								</label>
@@ -421,7 +421,7 @@
 										type="button"
 										onclick={copySlugPreview}
 										title="Copy slug link"
-										class="mt-2 block w-full truncate rounded-lg bg-paper px-2.5 py-1.5 text-left font-mono text-xs text-iris hover:underline dark:bg-night dark:text-indigo-300"
+										class="mt-2 block w-full truncate bg-paper px-2.5 py-1.5 text-left font-mono text-xs text-iris hover:underline dark:bg-night dark:text-indigo-300"
 									>
 										/s/{slugClean} ⧉
 									</button>
@@ -433,7 +433,7 @@
 										bind:value={optPassword}
 										placeholder="Optional"
 										autocomplete="new-password"
-										class="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+										class="w-full border border-line bg-paper px-3 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 									/>
 									<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">Min 4 characters. Readers type this to open the link.</span>
 								</label>
@@ -442,7 +442,7 @@
 										<span class="mb-1.5 block text-sm font-medium">Expires</span>
 										<select
 											bind:value={expiry}
-											class="w-full rounded-xl border border-line bg-paper px-2.5 py-2 text-sm focus:border-iris dark:border-night-line dark:bg-night"
+											class="w-full border border-line bg-paper px-2.5 py-2 text-sm focus:border-iris dark:border-night-line dark:bg-night"
 										>
 											<option value="0">Never</option>
 											<option value="3600">1 hour</option>
@@ -460,14 +460,14 @@
 											step="1"
 											bind:value={maxViews}
 											placeholder="Unlimited"
-											class="w-full rounded-xl border border-line bg-paper px-2.5 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+											class="w-full border border-line bg-paper px-2.5 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 										/>
 									</label>
 								</div>
 								<button
 									type="button"
 									onclick={closeOptions}
-									class="btn-accent mt-4 w-full rounded-xl px-4 py-2 text-sm font-semibold transition"
+									class="btn-accent mt-4 w-full px-4 py-2 text-sm font-semibold transition"
 								>
 									Done
 								</button>
@@ -476,10 +476,10 @@
 						<button
 							onclick={share}
 							disabled={!canShare}
-							class="btn-accent inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[15px] font-semibold transition"
+							class="btn-accent inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold transition"
 						>
 							{#if busy}
-								<span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60" aria-hidden="true"></span>
+								<span class="size-4 animate-spin border-2 border-current border-t-transparent opacity-60" aria-hidden="true"></span>
 								Sharing…
 							{:else}
 								Share

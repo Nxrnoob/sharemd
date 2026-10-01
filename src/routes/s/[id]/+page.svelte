@@ -176,7 +176,7 @@
 {#if isGone}
 	<!-- expired or views exhausted: no content, friendly way out -->
 	<main class="mx-auto grid w-full max-w-xl flex-1 place-items-center px-4 py-16 sm:px-6">
-		<div class="rise w-full rounded-2xl border border-line bg-surface p-6 text-center sm:p-8 dark:border-night-line dark:bg-night-surface">
+		<div class="rise w-full border border-line bg-surface p-6 text-center sm:p-8 dark:border-night-line dark:bg-night-surface">
 			<p class="font-mono text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Link done</p>
 			<h1 class="font-display mt-3 text-2xl font-bold tracking-tight">This link expired or hit its view limit.</h1>
 			<p class="mt-3 text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
@@ -184,7 +184,7 @@
 			</p>
 			<a
 				href="/"
-				class="btn-accent mt-6 inline-flex items-center justify-center rounded-xl px-6 py-2.5 text-[15px] font-semibold transition"
+				class="btn-accent mt-6 inline-flex items-center justify-center px-6 py-2.5 text-[15px] font-semibold transition"
 			>
 				Share a new doc
 			</a>
@@ -193,7 +193,7 @@
 {:else if isGated}
 	<!-- password gate: no content until unlocked -->
 	<main class="mx-auto grid w-full max-w-xl flex-1 place-items-center px-4 py-16 sm:px-6">
-		<div class="rise w-full rounded-2xl border border-line bg-surface p-6 sm:p-8 dark:border-night-line dark:bg-night-surface">
+		<div class="rise w-full border border-line bg-surface p-6 sm:p-8 dark:border-night-line dark:bg-night-surface">
 			<p class="font-mono text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Protected link</p>
 			<h1 class="font-display mt-3 text-2xl font-bold tracking-tight">This link is locked.</h1>
 			<p class="mt-3 text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
@@ -217,7 +217,7 @@
 						}}
 						placeholder="Link password"
 						autocomplete="off"
-						class="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+						class="w-full border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 					/>
 				</label>
 				{#if gateError}
@@ -226,10 +226,10 @@
 				<button
 					type="submit"
 					disabled={pwBusy}
-					class="btn-accent mt-4 inline-flex w-full items-center justify-center rounded-xl px-6 py-2.5 text-[15px] font-semibold transition"
+					class="btn-accent mt-4 inline-flex w-full items-center justify-center px-6 py-2.5 text-[15px] font-semibold transition"
 				>
 					{#if pwBusy}
-						<span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60" aria-hidden="true"></span>
+						<span class="size-4 animate-spin border-2 border-current border-t-transparent opacity-60" aria-hidden="true"></span>
 						Unlocking…
 					{:else}
 						Unlock
@@ -253,19 +253,19 @@
 		<div class="flex shrink-0 items-center gap-1.5">
 			<button
 				onclick={copyLink}
-				class="rounded-xl border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line dark:hover:border-indigo-300 dark:hover:text-indigo-200"
+				class=" border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line dark:hover:border-indigo-300 dark:hover:text-indigo-200"
 			>
 				Copy link
 			</button>
 			<a
 				href={themedRawPath}
-				class="rounded-xl border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line dark:hover:border-indigo-300 dark:hover:text-indigo-200"
+				class=" border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line dark:hover:border-indigo-300 dark:hover:text-indigo-200"
 			>
 				Raw
 			</a>
 			<button
 				onclick={download}
-				class="btn-accent rounded-xl px-3 py-1.5 text-[13px] font-medium transition"
+				class="btn-accent px-3 py-1.5 text-[13px] font-medium transition"
 			>
 				Download .md
 			</button>
@@ -276,13 +276,13 @@
 			<button
 				onclick={toggleToc}
 				aria-expanded={tocOpen}
-				class="font-mono text-[11px] tracking-wide text-ink-soft uppercase hover:text-iris dark:text-slate-500"
+				class="font-display text-[13px] font-semibold tracking-tight hover:text-iris"
 			>
-				{tocOpen ? 'Hide contents' : `+ Contents (${toc.length})`}
+				{tocOpen ? 'Hide contents' : `Contents (${toc.length})`}
 			</button>
 			{#if tocOpen}
 				<nav aria-label="Table of contents">
-					<ul class="mt-2 space-y-1 border-l-2 border-line pl-3 dark:border-night-line">
+					<ul class="mt-2 space-y-1">
 						{#each toc as t}
 							<li class={t.level === 3 ? 'pl-4' : t.level === 2 ? 'pl-2' : ''}>
 								<a
@@ -310,7 +310,7 @@
 			>
 				{@html data.html}
 			</article>
-			<div class="mt-10 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 dark:border-night-line dark:bg-night-surface">
+			<div class="mt-10 flex items-center justify-between gap-3 border border-line bg-surface px-4 py-3 dark:border-night-line dark:bg-night-surface">
 				<p class="text-[13px] text-ink-soft dark:text-slate-500">Unlisted. Anyone with the link can read.</p>
 				<a href="/" class="shrink-0 text-sm font-medium text-iris hover:underline hover:underline-offset-2 dark:text-indigo-300">Share your own →</a>
 			</div>
