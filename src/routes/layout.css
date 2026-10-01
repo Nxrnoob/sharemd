@@ -513,3 +513,10 @@ pre:has(> code.shiki) code {
 *, *::before, *::after {
 	border-radius: 0 !important;
 }
+
+/* ---------- theme swatch: sanctioned circle exception ----------
+   Split-circle preview (half page bg, half accent) via linear-gradient.
+   Class specificity beats the universal lock above. Nothing else uses it. */
+.swatch-split {
+	border-radius: 9999px !important;
+}

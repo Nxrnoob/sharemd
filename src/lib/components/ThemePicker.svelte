@@ -107,12 +107,10 @@
 		class="flex h-9 items-center gap-2 border border-line bg-surface px-2.5 text-[13px] font-medium transition hover:border-iris"
 	>
 		<span
-			class="grid size-4 shrink-0 place-items-center rounded-none border"
-			style="background: {active.tokens.bg}; border-color: {active.tokens.border}"
 			aria-hidden="true"
-		>
-			<span class="size-1.5 rounded-none" style="background: {active.tokens.accent}" aria-hidden="true"></span>
-		</span>
+			class="swatch-split size-4 shrink-0 border"
+			style="background: linear-gradient(90deg, {active.tokens.bg} 50%, {active.tokens.accent} 50%); border-color: {active.tokens.border}"
+		></span>
 		<span class="hidden max-w-28 truncate sm:inline">{active.label}</span>
 		<span aria-hidden="true" class="text-[11px] opacity-60">▾</span>
 	</button>
@@ -146,12 +144,10 @@
 						: 'hover:bg-black/5 dark:hover:bg-white/5'}"
 				>
 					<span
-						class="grid size-5 shrink-0 place-items-center rounded-none border"
-						style="background: {t.tokens.bg}; border-color: {t.tokens.border}"
 						aria-hidden="true"
-					>
-						<span class="size-2 rounded-none" style="background: {t.tokens.accent}" aria-hidden="true"></span>
-					</span>
+						class="swatch-split size-5 shrink-0 border"
+						style="background: linear-gradient(90deg, {t.tokens.bg} 50%, {t.tokens.accent} 50%); border-color: {t.tokens.border}"
+					></span>
 					<span class="flex-1 truncate">{t.label}</span>
 					{#if t.id === current}
 						<span aria-hidden="true" class="text-iris">✓</span>
