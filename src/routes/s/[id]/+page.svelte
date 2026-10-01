@@ -36,6 +36,9 @@
 	let pwBusy = $state(false);
 	let pwError = $state<string | null>(null);
 	let unlockTried = $state(false);
+	// True between submit and the refreshed load data landing. The error is
+	// only ever set from the *latest* completed attempt, never the flight.
+	let unlockPending = $state(false);
 
 	type LoadFlags = { passwordRequired?: boolean; gone?: boolean };
 	const flags = $derived((data ?? {}) as typeof data & LoadFlags);
@@ -97,11 +100,12 @@
 
 	async function unlock() {
 		pwError = null;
+		unlockTried = false;
 		if (!pwInput.trim()) {
 			pwError = 'Type the password first.';
 			return;
 		}
-		unlockTried = true;
+		unlockPending = true;
 		pwBusy = true;
 		try {
 			// Keep ?theme= (and anything else) while adding ?pw=.
@@ -112,6 +116,16 @@
 			pwBusy = false;
 		}
 	}
+
+	// Resolve the pending attempt once fresh load data arrives: a still-gated
+	// doc means the latest attempt failed; an unlocked doc clears silently,
+	// so a correct password never flashes the error on its way in.
+	$effect(() => {
+		void data;
+		if (!unlockPending) return;
+		unlockPending = false;
+		if (isGated) unlockTried = true;
+	});
 
 	onMount(() => {
 		// Link theme override (?theme=): session-only, viewer storage untouched.
@@ -131,17 +145,42 @@
 			if (isThemeId(ds)) screenTheme = ds;
 		});
 		themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-		// Derive TOC from the server-rendered headings (ids are user-content-*).
-		// No markdown re-parse: avoids hydration mismatch.
-		if (!articleEl) return;
-		const heads = Array.from(articleEl.querySelectorAll('h1[id], h2[id], h3[id]')).slice(0, 20);
+		return () => {
+			themeObs.disconnect();
+			delete document.documentElement.dataset.tocOpen;
+		};
+	});
+
+	// Rebuild the TOC whenever the article element renders or the unlocked
+	// content swaps in. goto(invalidateAll) reuses this component instance,
+	// so onMount does NOT re-run after unlock: without this effect the rail
+	// and floating TOC would stay empty on newly unlocked docs.
+	$effect(() => {
+		const el = articleEl;
+		const html = data.html;
+		if (!el || !html) {
+			toc = [];
+			activeId = null;
+			return;
+		}
+		// h1-h3 only by design; skip anything inside <pre> (code text, never
+		// a real heading); dedupe ids so each anchor is unique. No count cap:
+		// every real heading appears.
+		const seen = new Set<string>();
+		const heads = Array.from(el.querySelectorAll('h1[id], h2[id], h3[id]')).filter(
+			(h) => !h.closest('pre')
+		);
 		toc = heads
 			.map((h) => ({
 				id: h.id,
 				text: (h.textContent ?? '').trim().slice(0, 80),
 				level: h.tagName === 'H1' ? 1 : h.tagName === 'H2' ? 2 : 3
 			}))
-			.filter((t) => t.id && t.text);
+			.filter((t) => {
+				if (!t.id || !t.text || seen.has(t.id)) return false;
+				seen.add(t.id);
+				return true;
+			});
 		activeId = toc[0]?.id ?? null;
 
 		// Scrollspy: highlight the heading nearest the top of the viewport.
@@ -154,11 +193,7 @@
 			{ rootMargin: '-72px 0px -75% 0px', threshold: 0 }
 		);
 		heads.forEach((h) => spy.observe(h));
-		return () => {
-			spy.disconnect();
-			themeObs.disconnect();
-			delete document.documentElement.dataset.tocOpen;
-		};
+		return () => spy.disconnect();
 	});
 </script>
 
@@ -214,6 +249,7 @@
 						oninput={() => {
 							pwError = null;
 							unlockTried = false;
+							unlockPending = false;
 						}}
 						placeholder="Link password"
 						autocomplete="off"

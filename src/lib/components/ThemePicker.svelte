@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { themes, DEFAULT_THEME_ID, getTheme, applyTheme, buildThemedUrl } from '$lib/themes';
+	import { themes, DEFAULT_THEME_ID, getTheme, applyTheme, applySessionTheme, buildThemedUrl } from '$lib/themes';
 	import type { ThemeId } from '$lib/themes';
 
 	let current = $state<string>(DEFAULT_THEME_ID);
@@ -37,8 +37,14 @@
 	}
 
 	function close(refocus = false) {
+		if (open) applySessionTheme(current);
 		open = false;
 		if (refocus) button?.focus();
+	}
+
+	function preview(id: string) {
+		// Session-only paint: no storage write, committed on click.
+		applySessionTheme(id);
 	}
 
 	function pick(id: string) {
@@ -118,6 +124,9 @@
 			tabindex="-1"
 			aria-label="Editor theme"
 			onkeydown={onMenuKey}
+			onmouseleave={() => {
+				if (open) applySessionTheme(current);
+			}}
 			class="absolute top-10 right-0 z-50 w-56 overflow-hidden border border-line bg-surface p-1 shadow-xl"
 		>
 			{#each themes as t, i (t.id)}
@@ -127,7 +136,11 @@
 					aria-checked={t.id === current}
 					tabindex={i === activeIndex ? 0 : -1}
 					onclick={() => pick(t.id)}
-					onmouseenter={() => (activeIndex = i)}
+					onmouseenter={() => {
+						activeIndex = i;
+						preview(t.id);
+					}}
+					onfocus={() => preview(t.id)}
 					class="flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-[13px] transition {t.id === current
 						? 'bg-iris/10 font-medium'
 						: 'hover:bg-black/5 dark:hover:bg-white/5'}"
