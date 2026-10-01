@@ -227,7 +227,7 @@
 				</p>
 				<span aria-hidden="true" class="ghost-word relative mt-2 block text-[clamp(2.75rem,10vw,4.5rem)] leading-[0.9] tracking-tight">PASTE</span>
 				<h1 class="font-display relative -mt-[0.55em] text-4xl leading-[1.04] font-bold tracking-tight text-balance sm:text-5xl lg:text-5xl">
-					Paste the md your AI gave you.<br />Read it beautifully.
+					Paste the md your AI gave you and<br />Read it beautifully here.
 				</h1>
 				<p class="mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
 					Drop a .md file or paste text. Get an unlisted link that reads well.
