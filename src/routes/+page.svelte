@@ -234,14 +234,13 @@
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
 	<div class="flex min-w-0 flex-col gap-6 lg:h-full lg:gap-8">
-		<!-- headline band: the type owns the top of the frame, clear of the
-		   panel below. The site header carries the brand globally. On phones
-		   the break is natural (balanced); on desktop the two lines are forced. -->
-		<header class="shrink-0 lg:pt-3">
+		<!-- headline band: compact, the user's own wording verbatim. On
+		   phones the break is natural (balanced); on desktop two lines. -->
+		<header class="shrink-0 lg:pt-2">
 			<h1
-				class="font-display rise relative text-balance font-bold tracking-tight text-[clamp(2.5rem,5vw,4.5rem)] leading-[1.02]"
+				class="font-display rise relative text-balance font-bold tracking-tight text-[clamp(2.25rem,4vw,3.75rem)] leading-[1.02]"
 			>
-				Paste the md your AI gave you.<br class="hidden lg:block" /> Read it beautifully.
+				Paste the md your AI gave you and<br class="hidden lg:block" /> Read it beautifully here.
 			</h1>
 		</header>
 
@@ -480,9 +479,10 @@
 			</div>
 		</section>
 
-			<!-- left on desktop: subtext, action, recent. Centered like the
-			   classic split; flows under the panel on phones. -->
-			<section class="rise rise-1 order-2 flex min-w-0 flex-col justify-center gap-6 lg:order-1 lg:min-h-0 lg:overflow-hidden">
+			<!-- left on desktop: subtext, action, recent. Top-aligned to the
+			   panel's top edge so the split reads as one row; flows under the
+			   panel on phones. -->
+			<section class="rise rise-1 order-2 flex min-w-0 flex-col justify-start gap-6 lg:order-1 lg:min-h-0 lg:overflow-hidden">
 				<p class="max-w-sm text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
 					Drop a .md file or paste text. Get an unlisted link that reads well.
 				</p>
