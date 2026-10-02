@@ -55,7 +55,7 @@ export const themes: ShareMdTheme[] = [
 			muted: '#9c93b0',
 			border: '#1e1b2e',
 			accent: '#cc00ff',
-			accentDeep: '#9900cc'
+			accentDeep: '#da5cff'
 		}
 	},
 	{
@@ -68,8 +68,8 @@ export const themes: ShareMdTheme[] = [
 			text: '#f8f8f2',
 			muted: '#9aa0b8',
 			border: '#44475a',
-			accent: '#bd93f9',
-			accentDeep: '#8b5cf6'
+			accent: '#a9a6c4',
+			accentDeep: '#c0bdd8'
 		}
 	},
 	{
@@ -82,8 +82,8 @@ export const themes: ShareMdTheme[] = [
 			text: '#cdd6f4',
 			muted: '#9399b2',
 			border: '#45475a',
-			accent: '#89b4fa',
-			accentDeep: '#5b7ec4'
+			accent: '#8aa0bf',
+			accentDeep: '#a3b8d2'
 		}
 	},
 	{
@@ -96,8 +96,8 @@ export const themes: ShareMdTheme[] = [
 			text: '#4c4f69',
 			muted: '#8c8fa1',
 			border: '#ccd0da',
-			accent: '#1e66f5',
-			accentDeep: '#174fb8'
+			accent: '#46688c',
+			accentDeep: '#35506c'
 		}
 	},
 	{
@@ -110,8 +110,8 @@ export const themes: ShareMdTheme[] = [
 			text: '#eceff4',
 			muted: '#9aa3b2',
 			border: '#4c566a',
-			accent: '#88c0d0',
-			accentDeep: '#5e81ac'
+			accent: '#a0b3c1',
+			accentDeep: '#b0c3cf'
 		}
 	},
 	{
@@ -124,8 +124,8 @@ export const themes: ShareMdTheme[] = [
 			text: '#e6edf3',
 			muted: '#9198a1',
 			border: '#30363d',
-			accent: '#4493f8',
-			accentDeep: '#1f6feb'
+			accent: '#6e93bd',
+			accentDeep: '#8facce'
 		}
 	},
 	{
@@ -138,8 +138,8 @@ export const themes: ShareMdTheme[] = [
 			text: '#f8f8f2',
 			muted: '#a6a28f',
 			border: '#49483e',
-			accent: '#a6e22e',
-			accentDeep: '#7da61b'
+			accent: '#a8b47f',
+			accentDeep: '#bcc79a'
 		}
 	},
 	{
@@ -152,8 +152,8 @@ export const themes: ShareMdTheme[] = [
 			text: '#c0caf5',
 			muted: '#8b91b5',
 			border: '#414868',
-			accent: '#7aa2f7',
-			accentDeep: '#3d59a1'
+			accent: '#8fa0c4',
+			accentDeep: '#a8b6d6'
 		}
 	},
 	{
@@ -166,8 +166,8 @@ export const themes: ShareMdTheme[] = [
 			text: '#ebdbb2',
 			muted: '#a89984',
 			border: '#504945',
-			accent: '#fabd2f',
-			accentDeep: '#d79921'
+			accent: '#cdb97e',
+			accentDeep: '#dcc998'
 		}
 	}
 ];

@@ -27,7 +27,7 @@
 		{#if link}
 			<a
 				href={link}
-				class="shrink-0 bg-white/15 px-2.5 py-1 font-mono text-xs underline-offset-2 hover:underline dark:bg-ink/10"
+				class="shrink-0 bg-white/15 px-2.5 py-1 text-xs underline-offset-2 hover:underline dark:bg-ink/10"
 				>Open</a
 			>
 		{/if}

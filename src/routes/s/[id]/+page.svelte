@@ -243,7 +243,7 @@
 	<!-- expired or views exhausted: no content, friendly way out -->
 	<main class="mx-auto grid w-full max-w-xl flex-1 place-items-center px-4 py-16 sm:px-6">
 		<div class="rise w-full border border-line bg-surface p-6 text-center sm:p-8 dark:border-night-line dark:bg-night-surface">
-			<p class="font-mono text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Link done</p>
+			<p class="text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Link done</p>
 			<h1 class="font-display mt-3 text-2xl font-bold tracking-tight">This link expired or hit its view limit.</h1>
 			<p class="mt-3 text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
 				Ask the sender for a fresh one, or share a doc of your own.
@@ -260,7 +260,7 @@
 	<!-- password gate: no content until unlocked -->
 	<main class="mx-auto grid w-full max-w-xl flex-1 place-items-center px-4 py-16 sm:px-6">
 		<div class="rise w-full border border-line bg-surface p-6 sm:p-8 dark:border-night-line dark:bg-night-surface">
-			<p class="font-mono text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Protected link</p>
+			<p class="text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Protected link</p>
 			<h1 class="font-display mt-3 text-2xl font-bold tracking-tight">This link is locked.</h1>
 			<p class="mt-3 text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
 				Type the password to open it. Ask the sender if you do not have it.
@@ -320,13 +320,13 @@
 		<div class="flex shrink-0 items-center gap-1.5">
 			<button
 				onclick={copyLink}
-				class=" border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line dark:hover:border-indigo-300 dark:hover:text-indigo-200"
+				class=" border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
 			>
 				Copy link
 			</button>
 			<a
 				href={themedRawPath}
-				class=" border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line dark:hover:border-indigo-300 dark:hover:text-indigo-200"
+				class=" border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
 			>
 				Raw
 			</a>
@@ -354,7 +354,7 @@
 							<li class={t.level === 3 ? 'pl-4' : t.level === 2 ? 'pl-2' : ''}>
 								<a
 									href={`#${t.id}`}
-									class="block truncate text-[13px] text-ink-soft hover:text-iris hover:underline hover:underline-offset-2 dark:text-slate-400 dark:hover:text-indigo-300"
+									class="block truncate text-[13px] text-ink-soft hover:text-iris hover:underline hover:underline-offset-2 dark:text-slate-400"
 									>{t.text}</a
 								>
 							</li>
@@ -379,7 +379,7 @@
 			</article>
 			<div class="mt-10 flex items-center justify-between gap-3 border border-line bg-surface px-4 py-3 dark:border-night-line dark:bg-night-surface">
 				<p class="text-[13px] text-ink-soft dark:text-slate-500">Unlisted. Anyone with the link can read.</p>
-				<a href="/" class="shrink-0 text-sm font-medium text-iris hover:underline hover:underline-offset-2 dark:text-indigo-300">Share your own →</a>
+				<a href="/" class="shrink-0 text-sm font-medium text-iris hover:underline hover:underline-offset-2">Share your own →</a>
 			</div>
 		</div>
 		<TocRail items={toc} activeId={activeId} />

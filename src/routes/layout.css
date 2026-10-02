@@ -1,11 +1,21 @@
-@import '@fontsource/space-grotesk/500.css';
-@import '@fontsource/space-grotesk/600.css';
-@import '@fontsource/space-grotesk/700.css';
-@import '@fontsource/ibm-plex-sans/400.css';
-@import '@fontsource/ibm-plex-sans/500.css';
-@import '@fontsource/ibm-plex-sans/600.css';
-@import '@fontsource/jetbrains-mono/400.css';
-@import '@fontsource/jetbrains-mono/500.css';
+/* Signature display face: Sentient (Fontshare), self-hosted, zero
+   external requests. Only the weights actually used are shipped:
+   500 (wordmark "share", TOC labels) and 700 (wordmark "MD", hero,
+   reader title — font-semibold resolves to 700 per CSS matching). */
+@font-face {
+	font-family: 'Sentient';
+	font-style: normal;
+	font-weight: 500;
+	font-display: swap;
+	src: url('/fonts/Sentient-Medium.woff2') format('woff2');
+}
+@font-face {
+	font-family: 'Sentient';
+	font-style: normal;
+	font-weight: 700;
+	font-display: swap;
+	src: url('/fonts/Sentient-Bold.woff2') format('woff2');
+}
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
@@ -16,9 +26,12 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-	--font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
-	--font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-	--font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+	/* Display: Sentient — characterful editorial serif, the reading voice.
+	   Body: system-ui — the neutral workhorse, zero requests.
+	   Mono: system mono — real data only (code, timestamps, counts). */
+	--font-display: 'Sentient', ui-sans-serif, system-ui, sans-serif;
+	--font-sans: ui-sans-serif, system-ui, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
 	/* Monochrome is the default theme: base tokens match it so the
 	   very first paint is already correct, before the init script runs. */
@@ -63,7 +76,7 @@
 	--color-ink-soft: #9c93b0;
 	--color-line: #1e1b2e;
 	--color-iris: #cc00ff;
-	--color-iris-deep: #9900cc;
+	--color-iris-deep: #da5cff;
 	--color-night: #000000;
 	--color-night-surface: #0b0b10;
 	--color-night-line: #1e1b2e;
@@ -92,8 +105,8 @@
 	--color-ink: #f8f8f2;
 	--color-ink-soft: #9aa0b8;
 	--color-line: #44475a;
-	--color-iris: #bd93f9;
-	--color-iris-deep: #8b5cf6;
+	--color-iris: #a9a6c4;
+	--color-iris-deep: #c0bdd8;
 	--color-night: #282a36;
 	--color-night-surface: #343746;
 	--color-night-line: #44475a;
@@ -105,8 +118,8 @@
 	--color-ink: #cdd6f4;
 	--color-ink-soft: #9399b2;
 	--color-line: #45475a;
-	--color-iris: #89b4fa;
-	--color-iris-deep: #5b7ec4;
+	--color-iris: #8aa0bf;
+	--color-iris-deep: #a3b8d2;
 	--color-night: #1e1e2e;
 	--color-night-surface: #313244;
 	--color-night-line: #45475a;
@@ -118,8 +131,8 @@
 	--color-ink: #4c4f69;
 	--color-ink-soft: #8c8fa1;
 	--color-line: #ccd0da;
-	--color-iris: #1e66f5;
-	--color-iris-deep: #174fb8;
+	--color-iris: #46688c;
+	--color-iris-deep: #35506c;
 	--color-night: #eff1f5;
 	--color-night-surface: #ffffff;
 	--color-night-line: #ccd0da;
@@ -131,8 +144,8 @@
 	--color-ink: #eceff4;
 	--color-ink-soft: #9aa3b2;
 	--color-line: #4c566a;
-	--color-iris: #88c0d0;
-	--color-iris-deep: #5e81ac;
+	--color-iris: #a0b3c1;
+	--color-iris-deep: #b0c3cf;
 	--color-night: #2e3440;
 	--color-night-surface: #3b4252;
 	--color-night-line: #4c566a;
@@ -144,8 +157,8 @@
 	--color-ink: #e6edf3;
 	--color-ink-soft: #9198a1;
 	--color-line: #30363d;
-	--color-iris: #4493f8;
-	--color-iris-deep: #1f6feb;
+	--color-iris: #6e93bd;
+	--color-iris-deep: #8facce;
 	--color-night: #0d1117;
 	--color-night-surface: #161b22;
 	--color-night-line: #30363d;
@@ -157,8 +170,8 @@
 	--color-ink: #f8f8f2;
 	--color-ink-soft: #a6a28f;
 	--color-line: #49483e;
-	--color-iris: #a6e22e;
-	--color-iris-deep: #7da61b;
+	--color-iris: #a8b47f;
+	--color-iris-deep: #bcc79a;
 	--color-night: #272822;
 	--color-night-surface: #36372f;
 	--color-night-line: #49483e;
@@ -170,8 +183,8 @@
 	--color-ink: #c0caf5;
 	--color-ink-soft: #8b91b5;
 	--color-line: #414868;
-	--color-iris: #7aa2f7;
-	--color-iris-deep: #3d59a1;
+	--color-iris: #8fa0c4;
+	--color-iris-deep: #a8b6d6;
 	--color-night: #1a1b26;
 	--color-night-surface: #24283b;
 	--color-night-line: #414868;
@@ -183,8 +196,8 @@
 	--color-ink: #ebdbb2;
 	--color-ink-soft: #a89984;
 	--color-line: #504945;
-	--color-iris: #fabd2f;
-	--color-iris-deep: #d79921;
+	--color-iris: #cdb97e;
+	--color-iris-deep: #dcc998;
 	--color-night: #282828;
 	--color-night-surface: #3c3836;
 	--color-night-line: #504945;
@@ -205,7 +218,8 @@ body {
 
 /* ---------- accent button (contrast AA on every theme) ----------
    Accent bg can be light (monochrome white) or vivid (nxr magenta),
-   so the label uses the page bg, never fixed white. */
+   so the label uses the page bg, never fixed white. On dark themes
+   iris-deep is a lighter tonal step (hover lift); on Latte it darkens. */
 .btn-accent {
 	background-color: var(--color-iris);
 	color: var(--color-paper);
@@ -269,9 +283,6 @@ body {
 	outline: 2px solid var(--color-iris);
 	outline-offset: 2px;
 	border-radius: 0;
-}
-.dark :where(a, button, input, textarea, [tabindex]):focus-visible {
-	outline-color: #a5b4fc;
 }
 
 /* ---------- signature: paper stack (quiet) ---------- */
@@ -381,7 +392,6 @@ body {
 	position: absolute;
 	top: 10px;
 	right: 10px;
-	font-family: var(--font-mono);
 	font-size: 11px;
 	letter-spacing: 0.04em;
 	padding: 5px 10px;

@@ -225,7 +225,7 @@
 				<span class="font-medium">share</span><span class="font-bold">MD</span>
 			</div>
 			<div class="rise rise-1 min-w-0">
-				<p class="font-mono relative text-xs tracking-widest text-ink-soft uppercase dark:text-slate-400">
+				<p class="relative text-xs tracking-widest text-ink-soft uppercase dark:text-slate-400">
 					Markdown sharing for developers
 				</p>
 				<span aria-hidden="true" class="ghost-word relative mt-2 block text-[clamp(2.75rem,10vw,4.5rem)] leading-[0.9] tracking-tight">PASTE</span>
@@ -247,14 +247,14 @@
 				</button>
 			</div>
 			<div class="rise rise-2 min-w-0">
-				<h2 class="font-mono text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
+				<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
 				{#if recentTop.length}
 					<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
 						{#each recentTop as doc (doc.id)}
 							<li>
 								<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
 									<span class="min-w-0 flex-1">
-										<span class="block truncate text-sm font-medium group-hover:text-iris dark:group-hover:text-indigo-300">{doc.title}</span>
+										<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
 										<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
 									</span>
 									<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
@@ -320,12 +320,12 @@
 							ondrop={onDrop}
 							class="shrink-0 cursor-pointer border border-dashed px-4 py-4 text-center transition {dragging
 								? 'border-solid border-iris bg-iris/[0.08]'
-								: 'border-line hover:border-iris dark:border-night-line dark:hover:border-indigo-300'}"
+								: 'border-line hover:border-iris dark:border-night-line'}"
 						>
 							<p class="text-sm font-medium">
 								{dragging ? 'Drop it here' : 'Drop your .md file here'}
 								<span class="font-normal text-ink-soft dark:text-slate-400">
-									or <span class="font-medium text-iris underline underline-offset-2 dark:text-indigo-300">browse files</span>
+									or <span class="font-medium text-iris underline underline-offset-2">browse files</span>
 									{#if fileName}
 										· <span class="font-mono text-xs">{fileName}</span>
 									{/if}
@@ -346,7 +346,7 @@
 						<span class="mb-1.5 flex items-baseline justify-between text-sm font-medium">
 							Title
 							{#if !titleTouched && title}
-								<span class="font-mono text-[11px] font-normal text-ink-soft dark:text-slate-500">taken from your first heading</span>
+								<span class="text-[11px] font-normal text-ink-soft dark:text-slate-500">taken from your first heading</span>
 							{/if}
 						</span>
 						<input
@@ -425,7 +425,7 @@
 										type="button"
 										onclick={copySlugPreview}
 										title="Copy slug link"
-										class="mt-2 block w-full truncate bg-paper px-2.5 py-1.5 text-left font-mono text-xs text-iris hover:underline dark:bg-night dark:text-indigo-300"
+										class="mt-2 block w-full truncate bg-paper px-2.5 py-1.5 text-left font-mono text-xs text-iris hover:underline dark:bg-night"
 									>
 										/s/{slugClean} ⧉
 									</button>
@@ -492,7 +492,7 @@
 						</button>
 					</div>
 					</div>
-					<p class="mt-2 shrink-0 text-center font-mono text-[11px] text-ink-soft sm:text-left dark:text-slate-500">
+					<p class="mt-2 shrink-0 text-center text-[11px] text-ink-soft sm:text-left dark:text-slate-500">
 						Link carries your current theme.
 					</p>
 				</div>
