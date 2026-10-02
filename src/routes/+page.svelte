@@ -233,25 +233,62 @@
 <AmbientCanvas bind:this={ambient} />
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
-	<!-- One grid, two readings. Mobile: headline / panel / rail stacks in
-	   source order. Desktop: headline and rail share the left column while
-	   the panel spans both rows on the right. -->
-	<div
-		class="grid min-h-0 flex-1 gap-6 lg:h-full lg:gap-x-12 lg:gap-y-6 lg:[grid-template-areas:'headline_panel'_'rail_panel'] lg:[grid-template-columns:minmax(0,7fr)_minmax(0,6fr)] lg:[grid-template-rows:auto_minmax(0,1fr)]"
-	>
-		<!-- left column, row 1: the headline, in the text column -->
-		<header class="shrink-0 lg:[grid-area:headline]">
-			<h1
-				class="font-display rise relative text-balance font-bold tracking-tight text-[clamp(1.75rem,2.4vw,2rem)] leading-[1.15]"
+	<div class="grid gap-8 lg:h-full lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12">
+		<!-- left: headline + subtext + cta + recent, one flowing centered
+		   column (a7f6b35 geometry). On phones the section dissolves via
+		   display:contents so its children interleave with the panel:
+		   headline, panel, subtext, cta, recent. -->
+		<section
+			class="flex min-w-0 flex-col gap-5 max-lg:contents lg:h-full lg:justify-center lg:overflow-hidden"
+		>
+			<div class="rise rise-1 min-w-0 max-lg:order-1">
+				<h1
+					class="font-display relative text-balance font-bold tracking-tight text-[clamp(1.5rem,2.3vw,1.6875rem)] leading-[1.12]"
+				>
+					Paste the md your AI gave you and<br class="hidden lg:block" /> Read it beautifully here.
+				</h1>
+			</div>
+			<p
+				class="rise rise-1 max-w-md text-[15px] leading-relaxed text-ink-soft max-lg:order-3 dark:text-slate-400"
 			>
-				Paste the md your AI gave you and<br class="hidden lg:block" /> Read it beautifully here.
-			</h1>
-		</header>
+				Drop a .md file or paste text. Get an unlisted link that reads well.
+			</p>
+			<div class="rise rise-2 max-lg:order-4">
+				<button
+					type="button"
+					onclick={focusEditor}
+					class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
+				>
+					Start pasting
+					<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
+				</button>
+			</div>
+			<div class="rise rise-2 min-w-0 max-lg:order-5">
+				<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
+				{#if recentTop.length}
+					<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
+						{#each recentTop as doc (doc.id)}
+							<li>
+								<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
+									<span class="min-w-0 flex-1">
+										<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
+										<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
+									</span>
+									<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
+								</a>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">No docs yet. Share your first.</p>
+				{/if}
+			</div>
+		</section>
 
-		<!-- right column, full height: the artifact -->
-		<section class="min-w-0 lg:[grid-area:panel] lg:h-full lg:min-h-0">
-				<div class="paper-stack h-full" data-dragging={dragging}>
-					<div class="machine machine-artifact flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
+		<!-- right: live editor pane -->
+		<section class="min-w-0 max-lg:order-2 lg:h-full lg:min-h-0 lg:py-6">
+			<div class="paper-stack h-full" data-dragging={dragging}>
+				<div class="machine machine-artifact flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
 					<div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
 						<div role="tablist" aria-label="Input method" class="inline-flex bg-paper p-1 dark:bg-night">
 							<button
@@ -478,45 +515,6 @@
 				</div>
 			</div>
 		</section>
-
-			<!-- left column, row 2: subtext, action, recent. Top-aligned so the
-			   text column reads as one unit beside the panel; flows under the
-			   panel on phones. -->
-			<section class="rise rise-1 flex min-w-0 flex-col justify-start gap-6 lg:[grid-area:rail] lg:min-h-0 lg:overflow-hidden">
-				<p class="max-w-sm text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
-					Drop a .md file or paste text. Get an unlisted link that reads well.
-				</p>
-				<div>
-					<button
-						type="button"
-						onclick={focusEditor}
-						class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
-					>
-						Start pasting
-						<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
-					</button>
-				</div>
-				<div class="min-w-0">
-					<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
-					{#if recentTop.length}
-						<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
-							{#each recentTop as doc (doc.id)}
-								<li>
-									<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
-										<span class="min-w-0 flex-1">
-											<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
-											<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
-										</span>
-										<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
-									</a>
-								</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">No docs yet. Share your first.</p>
-					{/if}
-				</div>
-			</section>
 	</div>
 </main>
 
