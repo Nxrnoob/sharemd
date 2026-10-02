@@ -10,7 +10,6 @@
 
 	const MAX_BYTES = 512 * 1024;
 
-	let tab = $state<'upload' | 'paste'>('upload');
 	let title = $state('');
 	let markdown = $state('');
 	let titleTouched = $state(false);
@@ -20,6 +19,8 @@
 	let toast = $state<{ message: string; kind: 'ok' | 'error'; link?: string | null } | null>(null);
 	let fileInput: HTMLInputElement | null = $state(null);
 	let textareaEl: HTMLTextAreaElement | null = $state(null);
+	// Whole-panel drop target: files can land anywhere on the machine.
+	let panelEl: HTMLElement | null = $state(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 	// Ambient ink field: bound for keystroke echoes (see pulseInk).
 	let ambient: { pulse: (nx: number, ny: number) => void } | null = $state(null);
@@ -106,6 +107,18 @@
 		e.preventDefault();
 		dragging = false;
 		readFile(e.dataTransfer?.files?.[0]);
+	}
+
+	// Panel-wide drag affordance: any hover inside the machine lights the
+	// strip; dragleave only clears when the pointer truly left the panel
+	// (child-to-child moves bubble dragleave and must not flicker).
+	function onPanelDragOver(e: DragEvent) {
+		e.preventDefault();
+		dragging = true;
+	}
+	function onPanelDragLeave(e: DragEvent) {
+		if (e.relatedTarget instanceof Node && panelEl?.contains(e.relatedTarget)) return;
+		dragging = false;
 	}
 
 	async function share() {
@@ -283,76 +296,50 @@
 		<!-- right: live editor pane -->
 		<section class="min-w-0 max-lg:order-2 lg:h-full lg:min-h-0 lg:py-6">
 			<div class="paper-stack h-full" data-dragging={dragging}>
-				<div class="machine machine-artifact flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
-					<div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
-						<div role="tablist" aria-label="Input method" class="inline-flex bg-paper p-1 dark:bg-night">
-							<button
-								role="tab"
-								aria-selected={tab === 'upload'}
-								onclick={() => (tab = 'upload')}
-								class=" px-4 py-1.5 text-sm font-medium transition {tab === 'upload'
-									? 'bg-surface text-ink shadow-sm dark:bg-night-surface dark:text-white'
-									: 'text-ink-soft hover:text-ink dark:text-slate-400 dark:hover:text-white'}"
-							>
-								Upload
-							</button>
-							<button
-								role="tab"
-								aria-selected={tab === 'paste'}
-								onclick={() => (tab = 'paste')}
-								class=" px-4 py-1.5 text-sm font-medium transition {tab === 'paste'
-									? 'bg-surface text-ink shadow-sm dark:bg-night-surface dark:text-white'
-									: 'text-ink-soft hover:text-ink dark:text-slate-400 dark:hover:text-white'}"
-							>
-								Paste
-							</button>
-						</div>
-						<p class="font-mono text-xs text-ink-soft tabular-nums dark:text-slate-500">
-							{charCount.toLocaleString()} chars · {kb} KB / 512 KB
-						</p>
-					</div>
-
-					{#if tab === 'upload'}
-						<div
-							role="button"
-							tabindex="0"
-							aria-label="Drop a markdown file here, or press Enter to browse"
-							onclick={() => fileInput?.click()}
-							onkeydown={(e) => {
-								if (e.key === 'Enter' || e.key === ' ') {
-									e.preventDefault();
-									fileInput?.click();
-								}
-							}}
-							ondragover={(e) => {
+				<div
+					bind:this={panelEl}
+					ondragover={onPanelDragOver}
+					ondragleave={onPanelDragLeave}
+					ondrop={onDrop}
+					role="region"
+					aria-label="Markdown editor, drop a file anywhere in this panel"
+					class="machine machine-artifact flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface"
+				>
+					<!-- drop strip: one affordance, not a mode. Files can land
+					   anywhere on the panel; the strip also opens the browser. -->
+					<div
+						role="button"
+						tabindex="0"
+						aria-label="Drop a markdown file here, or press Enter to browse"
+						onclick={() => fileInput?.click()}
+						onkeydown={(e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
 								e.preventDefault();
-								dragging = true;
-							}}
-							ondragleave={() => (dragging = false)}
-							ondrop={onDrop}
-							class="shrink-0 cursor-pointer border border-dashed px-4 py-4 text-center transition {dragging
-								? 'border-solid border-iris bg-iris/[0.08]'
-								: 'border-line hover:border-iris dark:border-night-line'}"
-						>
-							<p class="text-sm font-medium">
-								{dragging ? 'Drop it here' : 'Drop your .md file here'}
-								<span class="font-normal text-ink-soft dark:text-slate-400">
-									or <span class="font-medium text-iris underline underline-offset-2">browse files</span>
-									{#if fileName}
-										· <span class="font-mono text-xs">{fileName}</span>
-									{/if}
-								</span>
-							</p>
-							<input
-								bind:this={fileInput}
-								type="file"
-								accept=".md,.markdown,.mdown,.txt,text/markdown,text/plain"
-								class="sr-only"
-								aria-label="Choose a markdown file"
-								onchange={(e) => readFile(e.currentTarget.files?.[0])}
-							/>
-						</div>
-					{/if}
+								fileInput?.click();
+							}
+						}}
+						class="shrink-0 cursor-pointer border border-dashed px-4 py-2.5 text-center transition {dragging
+							? 'border-solid border-iris bg-iris/[0.08]'
+							: 'border-line hover:border-iris dark:border-night-line'}"
+					>
+						<p class="text-sm font-medium">
+							{dragging ? 'Drop it here' : 'Drop your .md file here'}
+							<span class="font-normal text-ink-soft dark:text-slate-400">
+								or <span class="font-medium text-iris underline underline-offset-2">browse files</span>
+								{#if fileName}
+									· <span class="font-mono text-xs">{fileName}</span>
+								{/if}
+							</span>
+						</p>
+						<input
+							bind:this={fileInput}
+							type="file"
+							accept=".md,.markdown,.mdown,.txt,text/markdown,text/plain"
+							class="sr-only"
+							aria-label="Choose a markdown file"
+							onchange={(e) => readFile(e.currentTarget.files?.[0])}
+						/>
+					</div>
 
 					<label class="block shrink-0">
 						<span class="mb-1.5 flex items-baseline justify-between text-sm font-medium">
@@ -372,13 +359,18 @@
 					</label>
 
 					<label class="flex min-h-0 flex-1 flex-col">
-						<span class="mb-1.5 block shrink-0 text-sm font-medium">Markdown</span>
+						<span class="mb-1.5 flex items-baseline justify-between text-sm font-medium">
+							Markdown
+							<span class="font-mono text-xs font-normal text-ink-soft tabular-nums dark:text-slate-500">
+								{charCount.toLocaleString()} chars · {kb} KB / 512 KB
+							</span>
+						</span>
 						<textarea
 							bind:this={textareaEl}
 							value={markdown}
 							oninput={(e) => onMarkdownInput(e.currentTarget.value)}
 							rows="6"
-							placeholder={tab === 'paste' ? '# Paste it here. Headings, tables, tasks, code.' : '# Type here. Dropping a file fills this in.'}
+							placeholder="# Type or drop a file. Headings, tables, tasks, code."
 							spellcheck="false"
 							class="machine-well min-h-0 w-full flex-1 resize-y border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris lg:resize-none dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 						></textarea>
