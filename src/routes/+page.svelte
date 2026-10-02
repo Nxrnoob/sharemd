@@ -233,23 +233,23 @@
 <AmbientCanvas bind:this={ambient} />
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
-	<div class="flex min-w-0 flex-col gap-6 lg:h-full lg:gap-8">
-		<!-- headline band: compact, the user's own wording verbatim. On
-		   phones the break is natural (balanced); on desktop two lines. -->
-		<header class="shrink-0 lg:pt-2">
+	<!-- One grid, two readings. Mobile: headline / panel / rail stacks in
+	   source order. Desktop: headline and rail share the left column while
+	   the panel spans both rows on the right. -->
+	<div
+		class="grid min-h-0 flex-1 gap-6 lg:h-full lg:gap-x-12 lg:gap-y-6 lg:[grid-template-areas:'headline_panel'_'rail_panel'] lg:[grid-template-columns:minmax(0,7fr)_minmax(0,6fr)] lg:[grid-template-rows:auto_minmax(0,1fr)]"
+	>
+		<!-- left column, row 1: the headline, in the text column -->
+		<header class="shrink-0 lg:[grid-area:headline]">
 			<h1
-				class="font-display rise relative text-balance font-bold tracking-tight text-[clamp(2.25rem,4vw,3.75rem)] leading-[1.02]"
+				class="font-display rise relative text-balance font-bold tracking-tight text-[clamp(1.75rem,2.4vw,2rem)] leading-[1.15]"
 			>
 				Paste the md your AI gave you and<br class="hidden lg:block" /> Read it beautifully here.
 			</h1>
 		</header>
 
-		<!-- body: the artifact leads on phones; on desktop the rail sits beside it -->
-		<div
-			class="grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12"
-		>
-			<!-- right on desktop: the artifact owns the frame -->
-			<section class="order-1 min-w-0 lg:order-2 lg:h-full lg:min-h-0">
+		<!-- right column, full height: the artifact -->
+		<section class="min-w-0 lg:[grid-area:panel] lg:h-full lg:min-h-0">
 				<div class="paper-stack h-full" data-dragging={dragging}>
 					<div class="machine machine-artifact flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
 					<div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
@@ -479,10 +479,10 @@
 			</div>
 		</section>
 
-			<!-- left on desktop: subtext, action, recent. Top-aligned to the
-			   panel's top edge so the split reads as one row; flows under the
+			<!-- left column, row 2: subtext, action, recent. Top-aligned so the
+			   text column reads as one unit beside the panel; flows under the
 			   panel on phones. -->
-			<section class="rise rise-1 order-2 flex min-w-0 flex-col justify-start gap-6 lg:order-1 lg:min-h-0 lg:overflow-hidden">
+			<section class="rise rise-1 flex min-w-0 flex-col justify-start gap-6 lg:[grid-area:rail] lg:min-h-0 lg:overflow-hidden">
 				<p class="max-w-sm text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
 					Drop a .md file or paste text. Get an unlisted link that reads well.
 				</p>
@@ -517,7 +517,6 @@
 					{/if}
 				</div>
 			</section>
-	</div>
 	</div>
 </main>
 
