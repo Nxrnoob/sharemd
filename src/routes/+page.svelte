@@ -233,20 +233,14 @@
 <AmbientCanvas bind:this={ambient} />
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
-	<div class="flex min-w-0 flex-col gap-8 lg:h-full lg:gap-3">
-		<!-- top band: wordmark + oversized two-line headline. The second line
-		   is offset right and breaks over the artifact edge below, so the
-		   type composes with the panel instead of stacking beside it. -->
-		<header class="relative z-10 shrink-0">
-			<div class="rise font-display text-[17px] font-semibold" aria-hidden="true">
-				<span class="font-medium">share</span><span class="font-bold">MD</span>
-			</div>
+	<div class="flex min-w-0 flex-col gap-8 lg:h-full lg:gap-8">
+		<!-- headline band: the type owns the top of the frame, clear of the
+		   panel below. The site header carries the brand globally. -->
+		<header class="shrink-0 lg:pt-3">
 			<h1
-				class="font-display rise rise-1 pointer-events-none relative z-10 mt-5 font-bold tracking-tight text-[clamp(2.4rem,4.6vw,4rem)] leading-[1.02] lg:-mb-[0.35em]"
+				class="font-display rise relative font-bold tracking-tight text-[clamp(2.5rem,5vw,4.5rem)] leading-[1.02]"
 			>
-				Paste the md your AI gave you and<br /><span class="block lg:pl-[1.1em]"
-					>Read it beautifully here.</span
-				>
+				Paste the md your AI gave you.<br />Read it beautifully.
 			</h1>
 		</header>
 
@@ -254,9 +248,23 @@
 		<div
 			class="grid min-h-0 flex-1 gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:items-stretch lg:gap-10"
 		>
-			<!-- left: keystroke echo up top, intent anchored to the bottom -->
-			<section class="flex min-w-0 flex-col justify-between gap-6 lg:min-h-0 lg:overflow-hidden lg:py-2">
-				<div class="rise rise-2">
+			<!-- left: one composed cluster anchored to the panel's baseline,
+			   so the rail reads as a unit instead of marooned fragments -->
+			<section class="rise rise-1 flex min-w-0 flex-col justify-end gap-5 lg:min-h-0 lg:overflow-hidden">
+				<p class="max-w-sm text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
+					Drop a .md file or paste text. Get an unlisted link that reads well.
+				</p>
+				<div>
+					<button
+						type="button"
+						onclick={focusEditor}
+						class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
+					>
+						Start pasting
+						<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
+					</button>
+				</div>
+				<div>
 					<p
 						class="font-display text-[clamp(2.75rem,4vw,3.5rem)] leading-none font-bold tabular-nums"
 					>
@@ -266,40 +274,25 @@
 						chars
 					</p>
 				</div>
-				<div class="rise rise-2 min-w-0 space-y-5">
-					<p class="max-w-sm text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
-						Drop a .md file or paste text. Get an unlisted link that reads well.
-					</p>
-					<div>
-						<button
-							type="button"
-							onclick={focusEditor}
-							class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
-						>
-							Start pasting
-							<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
-						</button>
-					</div>
-					<div class="min-w-0">
-						<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
-						{#if recentTop.length}
-							<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
-								{#each recentTop as doc (doc.id)}
-									<li>
-										<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
-											<span class="min-w-0 flex-1">
-												<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
-												<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
-											</span>
-											<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
-										</a>
-									</li>
-								{/each}
-							</ul>
-						{:else}
-							<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">No docs yet. Share your first.</p>
-						{/if}
-					</div>
+				<div class="min-w-0">
+					<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
+					{#if recentTop.length}
+						<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
+							{#each recentTop as doc (doc.id)}
+								<li>
+									<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
+										<span class="min-w-0 flex-1">
+											<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
+											<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
+										</span>
+										<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
+									</a>
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">No docs yet. Share your first.</p>
+					{/if}
 				</div>
 			</section>
 
