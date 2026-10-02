@@ -233,71 +233,24 @@
 <AmbientCanvas bind:this={ambient} />
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
-	<div class="flex min-w-0 flex-col gap-8 lg:h-full lg:gap-8">
+	<div class="flex min-w-0 flex-col gap-6 lg:h-full lg:gap-8">
 		<!-- headline band: the type owns the top of the frame, clear of the
-		   panel below. The site header carries the brand globally. -->
+		   panel below. The site header carries the brand globally. On phones
+		   the break is natural (balanced); on desktop the two lines are forced. -->
 		<header class="shrink-0 lg:pt-3">
 			<h1
-				class="font-display rise relative font-bold tracking-tight text-[clamp(2.5rem,5vw,4.5rem)] leading-[1.02]"
+				class="font-display rise relative text-balance font-bold tracking-tight text-[clamp(2.5rem,5vw,4.5rem)] leading-[1.02]"
 			>
-				Paste the md your AI gave you.<br />Read it beautifully.
+				Paste the md your AI gave you.<br class="hidden lg:block" /> Read it beautifully.
 			</h1>
 		</header>
 
-		<!-- body: intent rail + the artifact -->
+		<!-- body: the artifact leads on phones; on desktop the rail sits beside it -->
 		<div
-			class="grid min-h-0 flex-1 gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:items-stretch lg:gap-10"
+			class="grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12"
 		>
-			<!-- left: one composed cluster anchored to the panel's baseline,
-			   so the rail reads as a unit instead of marooned fragments -->
-			<section class="rise rise-1 flex min-w-0 flex-col justify-end gap-5 lg:min-h-0 lg:overflow-hidden">
-				<p class="max-w-sm text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
-					Drop a .md file or paste text. Get an unlisted link that reads well.
-				</p>
-				<div>
-					<button
-						type="button"
-						onclick={focusEditor}
-						class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
-					>
-						Start pasting
-						<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
-					</button>
-				</div>
-				<div>
-					<p
-						class="font-display text-[clamp(2.75rem,4vw,3.5rem)] leading-none font-bold tabular-nums"
-					>
-						{charCount.toLocaleString()}
-					</p>
-					<p class="mt-1 text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">
-						chars
-					</p>
-				</div>
-				<div class="min-w-0">
-					<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
-					{#if recentTop.length}
-						<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
-							{#each recentTop as doc (doc.id)}
-								<li>
-									<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
-										<span class="min-w-0 flex-1">
-											<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
-											<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
-										</span>
-										<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
-									</a>
-								</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">No docs yet. Share your first.</p>
-					{/if}
-				</div>
-			</section>
-
-			<!-- right: the artifact owns the frame -->
-			<section class="min-w-0 lg:h-full lg:min-h-0">
+			<!-- right on desktop: the artifact owns the frame -->
+			<section class="order-1 min-w-0 lg:order-2 lg:h-full lg:min-h-0">
 				<div class="paper-stack h-full" data-dragging={dragging}>
 					<div class="machine machine-artifact flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
 					<div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
@@ -526,6 +479,44 @@
 				</div>
 			</div>
 		</section>
+
+			<!-- left on desktop: subtext, action, recent. Centered like the
+			   classic split; flows under the panel on phones. -->
+			<section class="rise rise-1 order-2 flex min-w-0 flex-col justify-center gap-6 lg:order-1 lg:min-h-0 lg:overflow-hidden">
+				<p class="max-w-sm text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
+					Drop a .md file or paste text. Get an unlisted link that reads well.
+				</p>
+				<div>
+					<button
+						type="button"
+						onclick={focusEditor}
+						class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
+					>
+						Start pasting
+						<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
+					</button>
+				</div>
+				<div class="min-w-0">
+					<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
+					{#if recentTop.length}
+						<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
+							{#each recentTop as doc (doc.id)}
+								<li>
+									<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
+										<span class="min-w-0 flex-1">
+											<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
+											<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
+										</span>
+										<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
+									</a>
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">No docs yet. Share your first.</p>
+					{/if}
+				</div>
+			</section>
 	</div>
 	</div>
 </main>
