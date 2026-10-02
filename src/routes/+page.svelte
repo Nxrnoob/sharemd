@@ -239,7 +239,7 @@
 		   display:contents so its children interleave with the panel:
 		   headline, panel, subtext, cta, recent. -->
 		<section
-			class="flex min-w-0 flex-col gap-5 max-lg:contents lg:h-full lg:justify-center lg:overflow-hidden"
+			class="flex min-w-0 flex-col gap-6 max-lg:contents lg:h-full lg:justify-center lg:overflow-hidden"
 		>
 			<div class="rise rise-1 min-w-0 max-lg:order-1">
 				<h1
@@ -248,12 +248,7 @@
 					Paste the md your AI gave you and<br class="hidden lg:block" /> Read it beautifully here.
 				</h1>
 			</div>
-			<p
-				class="rise rise-1 max-w-md text-[15px] leading-relaxed text-ink-soft max-lg:order-3 dark:text-slate-400"
-			>
-				Drop a .md file or paste text. Get an unlisted link that reads well.
-			</p>
-			<div class="rise rise-2 max-lg:order-4">
+			<div class="rise rise-2 max-lg:order-3">
 				<button
 					type="button"
 					onclick={focusEditor}
@@ -263,7 +258,7 @@
 					<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
 				</button>
 			</div>
-			<div class="rise rise-2 min-w-0 max-lg:order-5">
+			<div class="rise rise-2 min-w-0 max-lg:order-4">
 				<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
 				{#if recentTop.length}
 					<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
@@ -509,9 +504,6 @@
 						</button>
 					</div>
 					</div>
-					<p class="mt-2 shrink-0 text-center text-[11px] text-ink-soft sm:text-left dark:text-slate-500">
-						Link carries your current theme.
-					</p>
 				</div>
 			</div>
 		</section>
