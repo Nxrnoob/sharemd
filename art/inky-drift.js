@@ -22,6 +22,10 @@ export function createInkyDrift(P5, mount, opts = {}) {
 	const reducedMotion = opts.reducedMotion === true;
 	let p = null;
 	let particles = [];
+	// Transient keystroke echoes: short-lived strokes radiating from the
+	// editor. Throttled and capped so heavy typing can never pile up work.
+	let bursts = [];
+	let lastPulse = 0;
 	let t = 0;
 	let tokens = opts.tokens;
 	let seed = hashSeed(opts.themeId || 'monochrome');
@@ -93,6 +97,25 @@ export function createInkyDrift(P5, mount, opts = {}) {
 				particles[i] = spawn(p5, i, false);
 			}
 		}
+		// Keystroke echoes: decelerate, sink slightly, fade to nothing.
+		// Pure paint on the same canvas; capped count bounds the cost.
+		for (let i = bursts.length - 1; i >= 0; i--) {
+			const b = bursts[i];
+			b.px = b.x;
+			b.py = b.y;
+			b.x += b.vx;
+			b.y += b.vy;
+			b.vx *= 0.94;
+			b.vy *= 0.94;
+			b.vy += 0.02;
+			b.age++;
+			const c = b.accent ? accent : ink;
+			c.setAlpha(Math.max(0, 110 * (1 - b.age / b.life)));
+			p5.stroke(c);
+			p5.strokeWeight(b.accent ? 1.4 : 1);
+			p5.line(b.px, b.py, b.x, b.y);
+			if (b.age >= b.life) bursts.splice(i, 1);
+		}
 	}
 
 	function boot(p5) {
@@ -100,6 +123,7 @@ export function createInkyDrift(P5, mount, opts = {}) {
 		p5.noiseSeed(seed);
 		p5.noiseDetail(3, 0.55);
 		particles = [];
+		bursts = [];
 		for (let i = 0; i < count(); i++) particles.push(spawn(p5, i, true));
 		t = p5.random(100);
 		// Pre-settle: lay down history so frame one already holds memory.
@@ -150,6 +174,36 @@ export function createInkyDrift(P5, mount, opts = {}) {
 		},
 		resume() {
 			if (p && !reducedMotion && settled) p.loop();
+		},
+		/**
+		 * Keystroke echo: a small burst of ink strokes near a normalized
+		 * canvas point (0..1). Throttled; no-op under reduced motion so the
+		 * static frame stays static.
+		 */
+		pulse(nx, ny) {
+			if (reducedMotion || !p || !settled) return;
+			const now =
+				typeof performance !== 'undefined' ? performance.now() : Date.now();
+			if (now - lastPulse < 90) return;
+			lastPulse = now;
+			const x = nx * p.width;
+			const y = ny * p.height;
+			for (let i = 0; i < 12; i++) {
+				const a = p.random(Math.PI * 2);
+				const sp = p.random(0.5, 2.4);
+				bursts.push({
+					x,
+					y,
+					px: x,
+					py: y,
+					vx: Math.cos(a) * sp,
+					vy: Math.sin(a) * sp - 0.3,
+					life: p.random(26, 64),
+					age: 0,
+					accent: p.random() < 0.4
+				});
+			}
+			if (bursts.length > 90) bursts.splice(0, bursts.length - 90);
 		},
 		destroy() {
 			if (p) {

@@ -9,7 +9,14 @@
 	}
 
 	let host: HTMLDivElement | null = $state(null);
-	let drift: { mount: () => void; updateTheme: (t: DriftTokens, id: string) => void; pause: () => void; resume: () => void; destroy: () => void } | null = null;
+	let drift: {
+		mount: () => void;
+		updateTheme: (t: DriftTokens, id: string) => void;
+		pause: () => void;
+		resume: () => void;
+		pulse?: (nx: number, ny: number) => void;
+		destroy: () => void;
+	} | null = null;
 	let themeTimer: ReturnType<typeof setTimeout> | null = null;
 	let dead = false;
 
@@ -42,6 +49,11 @@
 	function onVisible() {
 		if (document.hidden) drift?.pause();
 		else drift?.resume();
+	}
+
+	/** Keystroke echo: forward a normalized (0..1) burst point to the field. */
+	export function pulse(nx: number, ny: number) {
+		drift?.pulse?.(nx, ny);
 	}
 
 	onMount(() => {

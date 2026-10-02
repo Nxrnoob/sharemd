@@ -232,15 +232,11 @@ body {
 	cursor: not-allowed;
 }
 
-/* ---------- landing signature: ghost outline word ----------
-   Display voice, transparent fill, hairline stroke from theme ink.
-   Decorative only (aria-hidden in markup). Theme-driven, radius-free. */
-.ghost-word {
-	font-family: var(--font-display);
-	font-weight: 700;
-	color: transparent;
-	-webkit-text-stroke: 1px color-mix(in srgb, var(--color-ink) 24%, transparent);
-	user-select: none;
+/* ---------- artifact emphasis: the editor owns the frame ----------
+   Accent hairline along the top edge, same treatment as code blocks,
+   so the panel reads as one machined instrument. Token-driven. */
+.machine-artifact {
+	border-top: 2px solid color-mix(in srgb, var(--color-iris) 45%, transparent);
 }
 
 /* ---------- machined hardware: sharp nested enclosures ----------

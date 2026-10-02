@@ -21,6 +21,8 @@
 	let fileInput: HTMLInputElement | null = $state(null);
 	let textareaEl: HTMLTextAreaElement | null = $state(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
+	// Ambient ink field: bound for keystroke echoes (see pulseInk).
+	let ambient: { pulse: (nx: number, ny: number) => void } | null = $state(null);
 
 	// Link options (sent only when set; backend ignores unknowns until its lane lands).
 	let optionsOpen = $state(false);
@@ -60,6 +62,19 @@
 	function onMarkdownInput(v: string) {
 		markdown = v;
 		autoTitle(v);
+		pulseInk();
+	}
+
+	// Keystroke echo: nudge the ambient field from somewhere inside the
+	// textarea's box. The factory throttles; reduced motion no-ops there.
+	function pulseInk() {
+		const el = textareaEl;
+		if (!ambient || !el) return;
+		const r = el.getBoundingClientRect();
+		if (r.width === 0 || r.height === 0) return;
+		const nx = (r.left + r.width * (0.25 + Math.random() * 0.5)) / window.innerWidth;
+		const ny = (r.top + r.height * (0.25 + Math.random() * 0.5)) / window.innerHeight;
+		ambient.pulse(nx, ny);
 	}
 
 	function focusEditor() {
@@ -215,63 +230,83 @@
 	}}
 />
 
-<AmbientCanvas />
+<AmbientCanvas bind:this={ambient} />
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
-	<div class="grid gap-8 lg:h-full lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12">
-		<!-- left: brand + headline + cta + recent -->
-		<section class="flex min-w-0 flex-col justify-center gap-5 lg:h-full lg:overflow-hidden">
+	<div class="flex min-w-0 flex-col gap-8 lg:h-full lg:gap-3">
+		<!-- top band: wordmark + oversized two-line headline. The second line
+		   is offset right and breaks over the artifact edge below, so the
+		   type composes with the panel instead of stacking beside it. -->
+		<header class="relative z-10 shrink-0">
 			<div class="rise font-display text-[17px] font-semibold" aria-hidden="true">
 				<span class="font-medium">share</span><span class="font-bold">MD</span>
 			</div>
-			<div class="rise rise-1 min-w-0">
-				<p class="relative text-xs tracking-widest text-ink-soft uppercase dark:text-slate-400">
-					Markdown sharing for developers
-				</p>
-				<span aria-hidden="true" class="ghost-word relative mt-2 block text-[clamp(2.75rem,10vw,4.5rem)] leading-[0.9] tracking-tight">PASTE</span>
-				<h1 class="font-display relative -mt-[0.55em] text-4xl leading-[1.04] font-bold tracking-tight text-balance sm:text-5xl lg:text-5xl">
-					Paste the md your AI gave you and<br />Read it beautifully here.
-				</h1>
-				<p class="mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
-					Drop a .md file or paste text. Get an unlisted link that reads well.
-				</p>
-			</div>
-			<div class="rise rise-2">
-				<button
-					type="button"
-					onclick={focusEditor}
-					class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
+			<h1
+				class="font-display rise rise-1 pointer-events-none relative z-10 mt-5 font-bold tracking-tight text-[clamp(2.4rem,4.6vw,4rem)] leading-[1.02] lg:-mb-[0.35em]"
+			>
+				Paste the md your AI gave you and<br /><span class="block lg:pl-[1.1em]"
+					>Read it beautifully here.</span
 				>
-					Start pasting
-					<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
-				</button>
-			</div>
-			<div class="rise rise-2 min-w-0">
-				<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
-				{#if recentTop.length}
-					<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
-						{#each recentTop as doc (doc.id)}
-							<li>
-								<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
-									<span class="min-w-0 flex-1">
-										<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
-										<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
-									</span>
-									<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
-								</a>
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">No docs yet. Share your first.</p>
-				{/if}
-			</div>
-		</section>
+			</h1>
+		</header>
 
-		<!-- right: live editor pane -->
-		<section class="min-w-0 lg:h-full lg:min-h-0 lg:py-6">
-			<div class="paper-stack h-full" data-dragging={dragging}>
-				<div class="machine flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
+		<!-- body: intent rail + the artifact -->
+		<div
+			class="grid min-h-0 flex-1 gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:items-stretch lg:gap-10"
+		>
+			<!-- left: keystroke echo up top, intent anchored to the bottom -->
+			<section class="flex min-w-0 flex-col justify-between gap-6 lg:min-h-0 lg:overflow-hidden lg:py-2">
+				<div class="rise rise-2">
+					<p
+						class="font-display text-[clamp(2.75rem,4vw,3.5rem)] leading-none font-bold tabular-nums"
+					>
+						{charCount.toLocaleString()}
+					</p>
+					<p class="mt-1 text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">
+						chars
+					</p>
+				</div>
+				<div class="rise rise-2 min-w-0 space-y-5">
+					<p class="max-w-sm text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
+						Drop a .md file or paste text. Get an unlisted link that reads well.
+					</p>
+					<div>
+						<button
+							type="button"
+							onclick={focusEditor}
+							class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
+						>
+							Start pasting
+							<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
+						</button>
+					</div>
+					<div class="min-w-0">
+						<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
+						{#if recentTop.length}
+							<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
+								{#each recentTop as doc (doc.id)}
+									<li>
+										<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
+											<span class="min-w-0 flex-1">
+												<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
+												<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
+											</span>
+											<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
+										</a>
+									</li>
+								{/each}
+							</ul>
+						{:else}
+							<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">No docs yet. Share your first.</p>
+						{/if}
+					</div>
+				</div>
+			</section>
+
+			<!-- right: the artifact owns the frame -->
+			<section class="min-w-0 lg:h-full lg:min-h-0">
+				<div class="paper-stack h-full" data-dragging={dragging}>
+					<div class="machine machine-artifact flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
 					<div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
 						<div role="tablist" aria-label="Input method" class="inline-flex bg-paper p-1 dark:bg-night">
 							<button
@@ -498,6 +533,7 @@
 				</div>
 			</div>
 		</section>
+	</div>
 	</div>
 </main>
 
