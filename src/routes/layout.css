@@ -347,12 +347,81 @@ body {
 	   so it contrasts on the themed surface in every theme. */
 	--tw-prose-pre-code: var(--color-ink);
 }
+/* ---------- reader tables: full theme-aware grid ----------
+   The table element doubles as its own scroll container (marked emits
+   no wrapper divs): block + overflow-x lets truly-wide tables scroll,
+   while normal cell wrapping means fitting tables never need to.
+   Real grid, all themes via tokens: outer outline, 1px cell hairlines,
+   tonal thead lift with a stronger header rule. Sharp per the lock. */
+/* ---------- reader tables: full theme-aware grid ----------
+   The table is ONE grid, so columns always align and it always fills:
+   thead/tbody/tr dissolve via display:contents, cells place row by row
+   into an explicit track list. Track count comes from the header row
+   (marked always emits equal column counts); minmax lets fitting tables
+   fill while unbreakable content grows tracks past the container, and
+   only then does the overflow-x scroller engage — fallback, never force.
+   Borders are single-weight throughout (no collapsing in grid): the
+   table frame plus right/bottom cell hairlines, a 2px header seam. */
 .prose-share :where(table) {
-	display: block;
+	display: grid;
 	width: 100%;
 	max-width: 100%;
 	overflow-x: auto;
-	white-space: nowrap;
+	scrollbar-width: thin;
+	border: 1px solid var(--color-line);
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(1):last-child) {
+	grid-template-columns: minmax(min-content, 1fr);
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(2):last-child) {
+	grid-template-columns: repeat(2, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(3):last-child) {
+	grid-template-columns: repeat(3, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(4):last-child) {
+	grid-template-columns: repeat(4, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(5):last-child) {
+	grid-template-columns: repeat(5, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(6):last-child) {
+	grid-template-columns: repeat(6, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(7):last-child) {
+	grid-template-columns: repeat(7, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(8):last-child) {
+	grid-template-columns: repeat(8, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(9):last-child) {
+	grid-template-columns: repeat(9, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(10):last-child) {
+	grid-template-columns: repeat(10, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(11):last-child) {
+	grid-template-columns: repeat(11, minmax(min-content, 1fr));
+}
+.prose-share :where(table):has(> thead > tr > th:nth-child(12):last-child) {
+	grid-template-columns: repeat(12, minmax(min-content, 1fr));
+}
+.prose-share :where(thead, tbody, tfoot, tr) {
+	display: contents;
+}
+.prose-share :where(th, td) {
+	border-right: 1px solid var(--color-line);
+	border-bottom: 1px solid var(--color-line);
+}
+.prose-share :where(th:last-child, td:last-child) {
+	border-right: 0;
+}
+.prose-share :where(thead th) {
+	background-color: var(--color-surface);
+	border-bottom: 2px solid var(--color-line);
+}
+.prose-share :where(tbody tr:last-child td) {
+	border-bottom: 0;
 }
 .prose-share :where(img) {
 	border-radius: 0;

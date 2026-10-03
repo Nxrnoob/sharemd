@@ -523,7 +523,7 @@
 							class="btn-accent btn-mag group inline-flex items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold active:scale-[0.98]"
 						>
 							{#if busy}
-								<span class="size-4 animate-spin border-2 border-current border-t-transparent opacity-60" aria-hidden="true"></span>
+								<span class="inline-block size-2 animate-pulse bg-current opacity-70" aria-hidden="true"></span>
 								Sharing…
 							{:else}
 								Share
