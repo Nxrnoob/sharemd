@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { gateDoc, resolveDoc, takeView } from '$lib/server/docs';
+import { deleteDoc, gateDoc, resolveDoc, takeView, verifyDeleteToken } from '$lib/server/docs';
+import { checkRateLimit } from '$lib/server/rate-limit';
 
 export const GET: RequestHandler = async ({ params, url }) => {
 	const { id } = params;
@@ -27,4 +28,34 @@ export const GET: RequestHandler = async ({ params, url }) => {
 		createdAt: row.createdAt,
 		views: row.views + 1
 	});
+};
+
+export const DELETE: RequestHandler = async ({ params, request, getClientAddress }) => {
+	const ip = getClientAddress?.() ?? 'unknown';
+	const { allowed } = checkRateLimit(ip);
+	if (!allowed) {
+		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
+	}
+
+	const { id } = params;
+	if (!id) return json({ error: 'Missing id' }, { status: 400 });
+
+	let body: unknown;
+	try {
+		body = await request.json();
+	} catch {
+		return json({ error: 'Invalid JSON' }, { status: 400 });
+	}
+	const { token } = body as { token?: unknown };
+
+	// Indistinguishable 404: unknown key and pre-token docs (NULL hash) look identical.
+	const row = resolveDoc(id);
+	if (!row || !row.deleteTokenHash) return json({ error: 'Not found' }, { status: 404 });
+
+	if (typeof token !== 'string' || !token || !verifyDeleteToken(row, token)) {
+		return json({ error: 'Forbidden' }, { status: 403 });
+	}
+
+	deleteDoc(row.id);
+	return json({ deleted: true });
 };

@@ -15,6 +15,13 @@
       "when": 1790821441821,
       "tag": "0001_aspiring_giant_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791018459041,
+      "tag": "0002_chief_starhawk",
+      "breakpoints": true
     }
   ]
 }

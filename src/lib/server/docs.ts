@@ -41,3 +41,18 @@ export function takeView(docId: string): boolean {
 	);
 	return res.changes > 0;
 }
+
+/**
+ * Constant-time delete-token check. False when the doc predates
+ * delete tokens (NULL hash) or the token mismatches. Never throws.
+ */
+export function verifyDeleteToken(doc: Document, token: string): boolean {
+	if (!doc.deleteTokenHash) return false;
+	return verifyPassword(token, doc.deleteTokenHash);
+}
+
+/** Hard-delete a doc row by id. Returns true when a row was removed. */
+export function deleteDoc(docId: string): boolean {
+	const res = db.delete(documents).where(eq(documents.id, docId)).run();
+	return res.changes > 0;
+}

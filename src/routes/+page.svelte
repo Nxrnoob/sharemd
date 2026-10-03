@@ -1,9 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import CoverArt from '$lib/components/CoverArt.svelte';
+	import DeleteDocButton from '$lib/components/DeleteDocButton.svelte';
 	import LetterField from '$lib/components/LetterField.svelte';
 	import { copyText } from '$lib/clipboard';
+	import { addToShelf, getShelf } from '$lib/shelf';
+	import type { DeleteResult } from '$lib/shelf';
 	import { buildThemedUrl, isThemeId, DEFAULT_THEME_ID } from '$lib/themes';
 	import type { ThemeId } from '$lib/themes';
 
@@ -24,8 +28,17 @@
 	// input (body-level canvas, decorative only — never blocks input).
 	let letterField: { plant: (text: string) => void } | null = $state(null);
 	let lastFieldPlant = 0;
+	// Silent-token shelf: ids shared from this browser (delete affordance).
+	// Hydrated client-side; SSR renders rows without icons.
+	let shelfIds = $state<Set<string>>(new Set());
+	let hiddenIds = $state<Set<string>>(new Set());
+
 	// Whole-panel drop target: files can land anywhere on the machine.
 	let panelEl: HTMLElement | null = $state(null);
+
+	onMount(() => {
+		shelfIds = new Set(getShelf().map((e) => e.id));
+	});
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Link options (sent only when set; backend ignores unknowns until its lane lands).
@@ -50,6 +63,21 @@
 	const pct = $derived(Math.min(100, (bytes / MAX_BYTES) * 100));
 	const canShare = $derived(markdown.trim().length > 0 && !overLimit && !busy);
 	const recentTop = $derived(data.recent.slice(0, 3));
+	const visibleRecent = $derived(recentTop.filter((d) => !hiddenIds.has(d.id)));
+
+	function onRecentDeleted(id: string) {
+		// Reassign (not mutate): $state Set updates only on assignment,
+		// so in-place add/delete would leave the row and its icon on screen.
+		hiddenIds = new Set(hiddenIds).add(id);
+		const next = new Set(shelfIds);
+		next.delete(id);
+		shelfIds = next;
+		showToast('Doc deleted.');
+	}
+
+	function onDeleteFailed(reason: Exclude<DeleteResult, 'deleted'>) {
+		showToast(reason === 'missing' ? 'That doc is already gone.' : 'Delete failed. Try again.', 'error');
+	}
 
 	function showToast(message: string, kind: 'ok' | 'error' = 'ok', link: string | null = null) {
 		if (toastTimer) clearTimeout(toastTimer);
@@ -193,10 +221,30 @@
 				})
 			});
 			const raw = (await res.json().catch(() => ({}))) as unknown;
-			const out = raw && typeof raw === 'object' ? (raw as { id?: string; url?: string; error?: string }) : {};
+			const out =
+				raw && typeof raw === 'object'
+					? (raw as { id?: string; url?: string; error?: string; slug?: string; deleteToken?: string })
+					: {};
 			if (!res.ok || typeof out.id !== 'string' || !out.id) {
 				showToast(friendlyError(res.status, typeof out.error === 'string' ? out.error : undefined), 'error');
 				return;
+			}
+			// Silent shelf record: the delete token never appears in UI.
+			const deleteToken = typeof out.deleteToken === 'string' && out.deleteToken ? out.deleteToken : null;
+			if (deleteToken) {
+				try {
+					addToShelf({
+						id: out.id,
+						slug: typeof out.slug === 'string' && out.slug ? out.slug : null,
+						title: finalTitle.slice(0, 200),
+						token: deleteToken,
+						createdAt: Date.now()
+					});
+					// Reassign (not mutate) so the own-row icon appears reactively.
+					shelfIds = new Set(shelfIds).add(out.id);
+				} catch {
+					/* shelf is best-effort; the share already succeeded */
+				}
 			}
 			const saved = typeof document !== 'undefined' ? document.documentElement.dataset.theme : null;
 			const themeId: ThemeId = isThemeId(saved) ? saved : DEFAULT_THEME_ID;
@@ -302,11 +350,11 @@
 			</div>
 			<div class="rise rise-2 min-w-0 max-lg:order-4">
 				<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
-				{#if recentTop.length}
+				{#if visibleRecent.length}
 					<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
-						{#each recentTop as doc (doc.id)}
-							<li>
-								<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
+						{#each visibleRecent as doc (doc.id)}
+							<li class="flex items-stretch">
+								<a href={`/s/${doc.id}`} class="group flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
 									<!-- Same Quiet Signals field as the reader banner, one seed per doc id. -->
 									<CoverArt
 										seedText={doc.id}
@@ -320,6 +368,11 @@
 									</span>
 									<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
 								</a>
+								{#if shelfIds.has(doc.id)}
+									<span class="flex shrink-0 items-center pr-1">
+										<DeleteDocButton id={doc.id} title={doc.title} onDeleted={onRecentDeleted} onDeleteFailed={onDeleteFailed} />
+									</span>
+								{/if}
 							</li>
 						{/each}
 					</ul>

@@ -9,6 +9,7 @@ export const documents = sqliteTable('documents', {
 	views: integer('views').notNull().default(0),
 	slug: text('slug').unique(),
 	passwordHash: text('password_hash'),
+	deleteTokenHash: text('delete_token_hash'),
 	expiresAt: integer('expires_at'),
 	maxViews: integer('max_views')
 });

@@ -57,6 +57,11 @@
 					class="border border-line px-3 py-1.5 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-iris"
 					>New doc</a
 				>
+				<a
+					href="/library"
+					class="border border-line px-3 py-1.5 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-iris"
+					>Library</a
+				>
 				<ThemePicker />
 			</div>
 		</div>

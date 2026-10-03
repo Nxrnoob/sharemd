@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { randomBytes } from 'node:crypto';
 import { nanoid } from 'nanoid';
 import { eq, or } from 'drizzle-orm';
 import { db } from '$lib/server/db';
@@ -88,6 +89,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const id = nanoid(8);
 	const html = await renderMarkdown(cleanMarkdown);
 
+	// Delete token: random 32-byte hex, scrypt-hashed at rest, plaintext returned once.
+	const deleteToken = randomBytes(32).toString('hex');
+	const deleteTokenHash = hashPassword(deleteToken);
+
 	db.insert(documents)
 		.values({
 			id,
@@ -98,10 +103,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			views: 0,
 			slug: slugVal,
 			passwordHash,
+			deleteTokenHash,
 			expiresAt,
 			maxViews: maxViewsVal
 		})
 		.run();
 
-	return json({ id, slug: slugVal, url: slugVal ? `/s/${slugVal}` : `/s/${id}` }, { status: 201 });
+	return json(
+		{ id, slug: slugVal, url: slugVal ? `/s/${slugVal}` : `/s/${id}`, deleteToken },
+		{ status: 201 }
+	);
 };
