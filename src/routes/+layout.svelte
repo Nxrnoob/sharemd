@@ -41,7 +41,7 @@
      opaque body background. See art/letter-field.js. -->
 <div class="relative z-10 flex min-h-dvh flex-col">
 	<header
-		class="site-header z-30 border-b border-line bg-paper/85 backdrop-blur transition-transform duration-300 dark:border-night-line dark:bg-night/85 {isReader
+		class="site-header z-30 border-b border-line transition-transform duration-300 dark:border-night-line {isReader
 			? 'sticky top-0'
 			: 'lg:sticky lg:top-0'} {headerHidden && isReader ? '-translate-y-full' : ''}"
 	>
