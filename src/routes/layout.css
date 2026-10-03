@@ -622,6 +622,67 @@ pre:has(> code.shiki) code {
 	}
 }
 
+/* ---------- print & pdf stylesheet ---------- */
+@media print {
+	.site-header,
+	footer,
+	.reading-progress,
+	.code-copy-btn,
+	.toc-rail,
+	.floating-toc,
+	.back-to-top,
+	.cover-art,
+	.print\\:hidden,
+	[aria-label="Table of contents"],
+	[role="dialog"] {
+		display: none !important;
+	}
+
+	html,
+	body,
+	main,
+	article {
+		background: #ffffff !important;
+		color: #111111 !important;
+		box-shadow: none !important;
+	}
+
+	article.prose {
+		max-width: 100% !important;
+		color: #111111 !important;
+	}
+
+	article.prose h1,
+	article.prose h2,
+	article.prose h3,
+	article.prose h4 {
+		color: #000000 !important;
+		page-break-after: avoid;
+		break-after: avoid;
+	}
+
+	pre,
+	code,
+	table {
+		page-break-inside: avoid;
+		break-inside: avoid;
+	}
+
+	pre.shiki {
+		background: #f8f9fa !important;
+		border: 1px solid #e2e8f0 !important;
+	}
+
+	.shiki span {
+		color: var(--shiki-light) !important;
+	}
+
+	a {
+		text-decoration: underline !important;
+		color: #111111 !important;
+	}
+}
+
 /* ---------- shape lock: all-sharp, radius 0 everywhere ----------
    Final say on corners. Any rounded-* utility or radius left in a
    component is flattened here so the system cannot drift. */

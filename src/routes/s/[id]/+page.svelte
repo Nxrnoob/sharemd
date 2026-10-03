@@ -317,7 +317,7 @@
 				{dateLabel} · {data.views} {data.views === 1 ? 'view' : 'views'} · {data.readTime}
 			</p>
 		</div>
-		<div class="flex shrink-0 items-center gap-1.5">
+		<div class="flex shrink-0 items-center gap-1.5 print:hidden">
 			<button
 				onclick={copyLink}
 				class=" border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
@@ -339,7 +339,7 @@
 		</div>
 	</div>
 	{#if toc.length >= 3}
-		<div class="mx-auto w-full max-w-3xl px-4 pb-3 sm:px-6 lg:hidden">
+		<div class="mx-auto w-full max-w-3xl px-4 pb-3 sm:px-6 lg:hidden print:hidden">
 			<button
 				onclick={toggleToc}
 				aria-expanded={tocOpen}
