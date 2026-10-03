@@ -54,7 +54,7 @@
 			<div class="flex items-center gap-2">
 				<a
 					href="/"
-					class=" px-3 py-1.5 text-sm font-medium text-ink-soft transition hover:bg-black/5 hover:text-ink dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+					class="border border-line px-3 py-1.5 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-iris"
 					>New doc</a
 				>
 				<ThemePicker />
