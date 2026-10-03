@@ -47,7 +47,7 @@ export const LETTER_FIELD_CANVAS_CSS =
 
 /**
  * @typedef {Object} LetterFieldHandle
- * @property {(text: string) => void} plant Plant literal characters as glyphs.
+ * @property {(text: string, anchor?: Element) => void} plant Plant literal characters as glyphs.
  * @property {() => void} retint Re-read theme colors; repaints when static.
  * @property {() => void} resize Refit the bitmap to the viewport.
  * @property {(paused: boolean) => void} setPaused Freeze/resume for tab-hidden.
@@ -169,6 +169,10 @@ export function createLetterField(canvas, options = {}) {
 	let raf = 0;
 	let paused = false;
 	let hiddenAt = 0;
+	// Monotonic plant counter mirrored to the canvas dataset. The field is
+	// visual only, but this lets harnesses assert exact plant accounting
+	// (e.g. no double-planting) without touching render state.
+	let plantedTotal = 0;
 
 	/**
 	 * Opaque rectangles ghost marks must avoid, in CSS pixels: the editor
@@ -228,6 +232,54 @@ export function createLetterField(canvas, options = {}) {
 		else if (pick === dt) y = s.top - m;
 		else y = s.bottom + m;
 		return { x, y };
+	}
+
+	/**
+	 * Sample a point in the neighborhood of a focused input: a halo around
+	 * its rect, resampled until clear of opaque surfaces, with the same
+	 * capped-tries + push-out discipline as the viewport scatter. Inputs
+	 * live inside the panel, so most halos resolve to its edges — glyphs
+	 * gather round the machine instead of hiding under it or over typed
+	 * text.
+	 *
+	 * @param {Element} el
+	 * @returns {{ x: number, y: number }}
+	 */
+	function placeNearElement(el) {
+		const vw = window.innerWidth;
+		const vh = window.innerHeight;
+		const r = el.getBoundingClientRect();
+		if (!(r.width > 4 && r.height > 4)) return placeOnClearGround();
+		const solids = currentSolids();
+		const m = 14;
+		const cx = r.left + r.width / 2;
+		const cy = r.top + r.height / 2;
+		let x = cx;
+		let y = cy;
+		for (let t = 0; t < 10; t++) {
+			const angle = rand() * Math.PI * 2;
+			const radius = 90 + rand() * 230;
+			x = clamp(
+				cx + Math.cos(angle) * radius * 1.25 + (rand() - 0.5) * 70,
+				14,
+				Math.max(28, vw - 14)
+			);
+			y = clamp(
+				cy + Math.sin(angle) * radius * 0.85 + (rand() - 0.5) * 70,
+				14,
+				Math.max(28, vh - 14)
+			);
+			if (!hitsSolid(x, y, solids, m)) return { x, y };
+		}
+		if (solids.length && hitsSolid(x, y, solids, m)) {
+			const out = pushClear(x, y, solids[0], m);
+			x = out.x;
+			y = out.y;
+		}
+		return {
+			x: clamp(x, 14, Math.max(28, vw - 14)),
+			y: clamp(y, 14, Math.max(28, vh - 14))
+		};
 	}
 
 	/**
@@ -316,10 +368,14 @@ export function createLetterField(canvas, options = {}) {
 	 * Plant literal characters as ghost glyphs. Callers pre-filter to
 	 * printable input; this stays defensive (skips whitespace and
 	 * controls, caps the burst) so a paste can never flood the field.
+	 * An optional anchor element pulls placement into its neighborhood
+	 * (still resampled clear of opaque surfaces); without one, glyphs
+	 * scatter across the whole viewport background.
 	 *
 	 * @param {string} text
+	 * @param {Element} [anchor]
 	 */
-	function plant(text) {
+	function plant(text, anchor) {
 		if (typeof text !== 'string' || !text) return;
 		if (paused) return; // tab hidden: drop rather than queue
 		readThemeColors();
@@ -332,8 +388,9 @@ export function createLetterField(canvas, options = {}) {
 			.slice(0, burstCap);
 		if (!chars.length) return;
 		const now = performance.now();
+		const near = anchor instanceof Element ? anchor : null;
 		for (const ch of chars) {
-			const p = placeOnClearGround();
+			const p = near ? placeNearElement(near) : placeOnClearGround();
 			const isAccent = rand() < 1 / 12;
 			/** @type {Glyph} */
 			const g = {
@@ -350,6 +407,12 @@ export function createLetterField(canvas, options = {}) {
 			glyphs.push(g);
 		}
 		while (glyphs.length > maxGlyphs) glyphs.shift();
+		plantedTotal += chars.length;
+		try {
+			canvas.dataset.planted = String(plantedTotal);
+		} catch {
+			/* proof counter only; the field itself is already planted */
+		}
 		if (reduced) {
 			// No fade loop: newcomers appear at final alpha over the kept field.
 			for (const g of glyphs.slice(-chars.length)) paintGlyph(g, g.alpha);

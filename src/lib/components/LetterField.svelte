@@ -23,6 +23,9 @@
 	// never content, never interactive.
 
 	let field: ReturnType<typeof createLetterField> | null = null;
+	// 40ms gate for the all-keys path below (mirrors the Markdown input
+	// path's gate in +page.svelte). Plain let: never rendered, no reactivity.
+	let lastKeyPlant = 0;
 
 	/** Plant literal input characters as ghost glyphs. No-op until mounted. */
 	export function plant(text: string): void {
@@ -51,6 +54,30 @@
 		const onMotion = (e: MediaQueryListEvent) => field?.setReducedMotion(e.matches);
 		motionQuery.addEventListener('change', onMotion);
 
+		// All-keys hook, landing scope is automatic: this component mounts
+		// only on the landing page. Printable keydowns plant their literal
+		// character — near the focused input when focus sits in one (Title,
+		// slug, password, max-views), scattered viewport-wide otherwise.
+		// The Markdown textarea is SKIPPED: its input path already plants
+		// with burst scaling, and planting here too would double every
+		// keystroke. Modifiers, controls, and whitespace plant nothing.
+		const onKey = (e: KeyboardEvent) => {
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			if (typeof e.key !== 'string' || e.key.length !== 1 || e.key.trim() === '') return;
+			if (e.target instanceof HTMLTextAreaElement) return;
+			const now = performance.now();
+			if (now - lastKeyPlant < 40) return;
+			lastKeyPlant = now;
+			const active = document.activeElement;
+			const anchor = active instanceof HTMLInputElement ? active : undefined;
+			try {
+				field?.plant(e.key, anchor);
+			} catch {
+				/* decorative only: keys must never fail because art did */
+			}
+		};
+		window.addEventListener('keydown', onKey);
+
 		// Theme retint with zero state writes: this callback never assigns
 		// to component state, so rapid ThemePicker preview hovers (many
 		// data-theme mutations per second) repaint only the bitmap and can
@@ -68,6 +95,7 @@
 
 		return () => {
 			window.removeEventListener('resize', onResize);
+			window.removeEventListener('keydown', onKey);
 			document.removeEventListener('visibilitychange', onVisibility);
 			motionQuery.removeEventListener('change', onMotion);
 			observer.disconnect();
