@@ -134,6 +134,39 @@
 		onMarkdownInput(e.currentTarget.value);
 	}
 
+	function onEditorKeyDown(e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
+		if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+			e.preventDefault();
+			if (canShare) share();
+			return;
+		}
+		if (e.key === 'Tab') {
+			e.preventDefault();
+			const ta = e.currentTarget;
+			const start = ta.selectionStart;
+			const end = ta.selectionEnd;
+			const val = ta.value;
+			if (e.shiftKey) {
+				const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+				if (val.slice(lineStart, lineStart + 2) === '  ') {
+					ta.value = val.slice(0, lineStart) + val.slice(lineStart + 2);
+					ta.selectionStart = Math.max(lineStart, start - 2);
+					ta.selectionEnd = Math.max(lineStart, end - 2);
+					onMarkdownInput(ta.value);
+				} else if (val[lineStart] === ' ') {
+					ta.value = val.slice(0, lineStart) + val.slice(lineStart + 1);
+					ta.selectionStart = Math.max(lineStart, start - 1);
+					ta.selectionEnd = Math.max(lineStart, end - 1);
+					onMarkdownInput(ta.value);
+				}
+			} else {
+				ta.value = val.substring(0, start) + '  ' + val.substring(end);
+				ta.selectionStart = ta.selectionEnd = start + 2;
+				onMarkdownInput(ta.value);
+			}
+		}
+	}
+
 	function focusEditor() {
 		textareaEl?.focus({ preventScroll: true });
 	}
@@ -458,6 +491,7 @@
 							bind:this={textareaEl}
 							value={markdown}
 							oninput={onEditorInput}
+							onkeydown={onEditorKeyDown}
 							rows="6"
 							placeholder="# Type or drop a file. Headings, tables, tasks, code."
 							spellcheck="false"
