@@ -12,5 +12,8 @@ export const dbPath = env.DATABASE_PATH ?? env.DATABASE_URL ?? '/data/local.db';
 mkdirSync(dirname(dbPath), { recursive: true });
 
 const client = new Database(dbPath);
+client.pragma('journal_mode = WAL');
+client.pragma('busy_timeout = 5000');
+client.pragma('synchronous = NORMAL');
 
 export const db = drizzle(client, { schema });
