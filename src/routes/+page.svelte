@@ -6,7 +6,7 @@
 	import DeleteDocButton from '$lib/components/DeleteDocButton.svelte';
 	import LetterField from '$lib/components/LetterField.svelte';
 	import { copyText } from '$lib/clipboard';
-	import { addToShelf, getShelf } from '$lib/shelf';
+	import { addToShelf, getShelf, type ShelfEntry } from '$lib/shelf';
 	import type { DeleteResult } from '$lib/shelf';
 	import { buildThemedUrl, isThemeId, DEFAULT_THEME_ID } from '$lib/themes';
 	import type { ThemeId } from '$lib/themes';
@@ -32,6 +32,7 @@
 	// Hydrated client-side; SSR renders rows without icons.
 	let shelfIds = $state<Set<string>>(new Set());
 	let hiddenIds = $state<Set<string>>(new Set());
+	let shelfDocs = $state<ShelfEntry[]>([]);
 
 	// Whole-panel drop target: files can land anywhere on the machine.
 	let panelEl: HTMLElement | null = $state(null);
@@ -64,7 +65,9 @@
 	}
 
 	onMount(() => {
-		shelfIds = new Set(getShelf().map((e) => e.id));
+		const items = getShelf();
+		shelfDocs = items;
+		shelfIds = new Set(items.map((e) => e.id));
 		try {
 			const saved = localStorage.getItem(DRAFT_KEY);
 			if (saved) {
@@ -103,8 +106,7 @@
 	const charCount = $derived(markdown.length);
 	const pct = $derived(Math.min(100, (bytes / MAX_BYTES) * 100));
 	const canShare = $derived(markdown.trim().length > 0 && !overLimit && !busy);
-	const recentTop = $derived(data.recent.slice(0, 3));
-	const visibleRecent = $derived(recentTop.filter((d) => !hiddenIds.has(d.id)));
+	const visibleRecent = $derived(shelfDocs.filter((d) => !hiddenIds.has(d.id)).slice(0, 3));
 
 	function onRecentDeleted(id: string) {
 		// Reassign (not mutate): $state Set updates only on assignment,
@@ -113,6 +115,7 @@
 		const next = new Set(shelfIds);
 		next.delete(id);
 		shelfIds = next;
+		shelfDocs = shelfDocs.filter((d) => d.id !== id);
 		showToast('Doc deleted.');
 	}
 
@@ -316,7 +319,8 @@
 						createdAt: Date.now()
 					});
 					// Reassign (not mutate) so the own-row icon appears reactively.
-					shelfIds = new Set(shelfIds).add(out.id);
+					shelfDocs = getShelf();
+					shelfIds = new Set(shelfDocs.map((e) => e.id));
 				} catch {
 					/* shelf is best-effort; the share already succeeded */
 				}
@@ -430,7 +434,7 @@
 					<ul class="mt-2 divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface">
 						{#each visibleRecent as doc (doc.id)}
 							<li class="flex items-stretch">
-								<a href={`/s/${doc.id}`} class="group flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
+								<a href={`/s/${doc.slug ?? doc.id}`} class="group flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
 									<!-- Same Quiet Signals field as the reader banner, one seed per doc id. -->
 									<CoverArt
 										seedText={doc.id}
@@ -440,7 +444,7 @@
 									/>
 									<span class="min-w-0 flex-1">
 										<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
-										<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
+										<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)}</span>
 									</span>
 									<span class="shrink-0 text-ink-soft transition group-hover:translate-x-0.5 group-hover:text-iris dark:text-slate-500" aria-hidden="true">→</span>
 								</a>
