@@ -6,6 +6,7 @@
 	import { copyText } from '$lib/clipboard';
 	import Toast from '$lib/components/Toast.svelte';
 	import TocRail from '$lib/components/TocRail.svelte';
+	import CoverArt from '$lib/components/CoverArt.svelte';
 	import TocFloating from '$lib/components/TocFloating.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
 	import ReadingProgress from '$lib/components/ReadingProgress.svelte';
@@ -370,6 +371,15 @@
 <main class="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10 lg:max-w-7xl">
 	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-12">
 		<div class="min-w-0">
+			<!-- Quiet Signals: per-doc cover band, seeded from the doc id.
+			   Sits above the title area at whisper opacity so the prose
+			   always wins. Skipped on gated/gone docs (other branches). -->
+			<CoverArt
+				seedText={data.id}
+				width={1200}
+				height={140}
+				class="rise mb-8 h-32 w-full border border-line bg-surface sm:h-36 dark:border-night-line dark:bg-night-surface"
+			/>
 			<article
 				bind:this={articleEl}
 				use:codeCopy

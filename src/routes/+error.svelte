@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import CoverArt from '$lib/components/CoverArt.svelte';
 </script>
 
 <svelte:head>
@@ -7,23 +8,33 @@
 </svelte:head>
 
 <main class="mx-auto grid w-full max-w-xl flex-1 place-items-center px-4 py-20 text-center sm:px-6">
-	<div class="rise">
-		<p class="text-xs tracking-widest text-iris uppercase">
-			{page.status === 404 ? 'Nothing here' : `Error ${page.status}`}
-		</p>
-		<h1 class="font-display mt-3 text-4xl font-bold tracking-tight">This link did not pan out.</h1>
-		<p class="mt-3 leading-relaxed text-ink-soft dark:text-slate-400">
-			{#if page.status === 404}
-				The doc may have never existed, or the link has a typo. Double-check the URL, or share a new doc.
-			{:else}
-				{page.error?.message ?? 'Something went wrong. Try again.'}
-			{/if}
-		</p>
-		<a
-			href="/"
-			class="btn-accent mt-6 inline-flex items-center gap-2 px-5 py-2.5 font-medium transition"
-		>
-			Share a new doc →
-		</a>
+	<div class="rise w-full">
+		<!-- Quiet Signals: every wrong URL hashes to its own field, so the
+		   miss at least gets its own art. Same system, same quietness. -->
+		<CoverArt
+			seedText={page.url.pathname}
+			width={1200}
+			height={140}
+			class="h-28 w-full border border-line bg-surface sm:h-32 dark:border-night-line dark:bg-night-surface"
+		/>
+		<div class="mt-8">
+			<p class="text-xs tracking-widest text-iris uppercase">
+				{page.status === 404 ? 'Nothing here' : `Error ${page.status}`}
+			</p>
+			<h1 class="font-display mt-3 text-4xl font-bold tracking-tight">This link did not pan out.</h1>
+			<p class="mt-3 leading-relaxed text-ink-soft dark:text-slate-400">
+				{#if page.status === 404}
+					The doc may have never existed, or the link has a typo. Double-check the URL, or share a new doc.
+				{:else}
+					{page.error?.message ?? 'Something went wrong. Try again.'}
+				{/if}
+			</p>
+			<a
+				href="/"
+				class="btn-accent mt-6 inline-flex items-center gap-2 px-5 py-2.5 font-medium transition"
+			>
+				Share a new doc →
+			</a>
+		</div>
 	</div>
 </main>

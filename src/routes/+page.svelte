@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import Toast from '$lib/components/Toast.svelte';
 	import AmbientCanvas from '$lib/components/AmbientCanvas.svelte';
+	import CoverArt from '$lib/components/CoverArt.svelte';
 	import { copyText } from '$lib/clipboard';
 	import { buildThemedUrl, isThemeId, DEFAULT_THEME_ID } from '$lib/themes';
 	import type { ThemeId } from '$lib/themes';
@@ -278,6 +279,13 @@
 						{#each recentTop as doc (doc.id)}
 							<li>
 								<a href={`/s/${doc.id}`} class="group flex items-center gap-3 px-3.5 py-2 transition hover:bg-iris/[0.04] dark:hover:bg-white/5">
+									<!-- Same Quiet Signals field as the reader banner, one seed per doc id. -->
+									<CoverArt
+										seedText={doc.id}
+										width={96}
+										height={96}
+										class="size-10 shrink-0 border border-line dark:border-night-line"
+									/>
 									<span class="min-w-0 flex-1">
 										<span class="block truncate text-sm font-medium group-hover:text-iris">{doc.title}</span>
 										<span class="mt-0.5 block font-mono text-[11px] text-ink-soft dark:text-slate-500">{timeAgo(doc.createdAt)} · {doc.views} {doc.views === 1 ? 'view' : 'views'}</span>
