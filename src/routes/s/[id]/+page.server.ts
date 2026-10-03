@@ -23,6 +23,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 			return {
 				...base,
 				html: '',
+				rawMarkdown: '',
 				views: row.views,
 				readTime: '',
 				gone: true as const,
@@ -33,6 +34,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		return {
 			...base,
 			html: '',
+			rawMarkdown: '',
 			views: row.views,
 			readTime: '',
 			gone: false as const,
@@ -46,6 +48,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		return {
 			...base,
 			html: '',
+			rawMarkdown: '',
 			views: row.views + 1,
 			readTime: '',
 			gone: true as const,
@@ -61,6 +64,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	return {
 		...base,
 		html: row.html,
+		rawMarkdown: row.rawMarkdown,
 		views: row.views + 1,
 		readTime: `${readMins} min read`,
 		gone: false as const,

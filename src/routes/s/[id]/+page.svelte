@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { owns, getOwnedToken, updateShelfTitle } from '$lib/shelf';
 	import { page } from '$app/state';
 	import { codeCopy } from '$lib/actions/codeCopy';
 	import { copyText } from '$lib/clipboard';
@@ -39,6 +40,12 @@
 	// True between submit and the refreshed load data landing. The error is
 	// only ever set from the *latest* completed attempt, never the flight.
 	let unlockPending = $state(false);
+	let isOwner = $state(false);
+	let editing = $state(false);
+	let editTitle = $state('');
+	let editMarkdown = $state('');
+	let editBusy = $state(false);
+	let editError = $state<string | null>(null);
 
 	type LoadFlags = { passwordRequired?: boolean; gone?: boolean };
 	const flags = $derived((data ?? {}) as typeof data & LoadFlags);
@@ -98,6 +105,111 @@
 		}
 	}
 
+	function startEditing() {
+		if (editing) {
+			editing = false;
+			editError = null;
+			return;
+		}
+		editTitle = data.title || '';
+		editMarkdown = data.rawMarkdown || '';
+		editError = null;
+		editing = true;
+	}
+
+	async function saveEdit() {
+		editError = null;
+		if (!editMarkdown.trim()) {
+			editError = 'Markdown cannot be empty.';
+			return;
+		}
+		const token = getOwnedToken(data.id);
+		if (!token) {
+			editError = 'Owner token not found in this browser.';
+			return;
+		}
+		editBusy = true;
+		try {
+			const res = await fetch(`/api/docs/${encodeURIComponent(data.id)}`, {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					title: editTitle.slice(0, 200),
+					markdown: editMarkdown,
+					token
+				})
+			});
+			const result = (await res.json().catch(() => ({}))) as { error?: unknown };
+			if (!res.ok) {
+				editError = typeof result.error === 'string' ? result.error : 'Save failed. Try again.';
+				return;
+			}
+			if (editTitle.trim()) {
+				updateShelfTitle(data.id, editTitle.trim());
+			}
+			editing = false;
+			await invalidateAll();
+			flash('Doc updated.');
+		} catch {
+			editError = 'Could not reach server. Check connection.';
+		} finally {
+			editBusy = false;
+		}
+	}
+
+	function onEditKeyDown(e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
+		if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+			e.preventDefault();
+			if (!editBusy) saveEdit();
+			return;
+		}
+		if (e.key === 'Tab') {
+			e.preventDefault();
+			const ta = e.currentTarget;
+			const start = ta.selectionStart;
+			const end = ta.selectionEnd;
+			const val = ta.value;
+			if (e.shiftKey) {
+				const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+				if (val.slice(lineStart, lineStart + 2) === '  ') {
+					ta.value = val.slice(0, lineStart) + val.slice(lineStart + 2);
+					ta.selectionStart = Math.max(lineStart, start - 2);
+					ta.selectionEnd = Math.max(lineStart, end - 2);
+					editMarkdown = ta.value;
+				} else if (val[lineStart] === ' ') {
+					ta.value = val.slice(0, lineStart) + val.slice(lineStart + 1);
+					ta.selectionStart = Math.max(lineStart, start - 1);
+					ta.selectionEnd = Math.max(lineStart, end - 1);
+					editMarkdown = ta.value;
+				}
+			} else {
+				ta.value = val.substring(0, start) + '  ' + val.substring(end);
+				ta.selectionStart = ta.selectionEnd = start + 2;
+				editMarkdown = ta.value;
+			}
+		}
+	}
+
+	async function forkDoc() {
+		try {
+			const draft = {
+				title: data.title ? `${data.title} (fork)` : 'Untitled fork',
+				markdown: data.rawMarkdown || ''
+			};
+			localStorage.setItem('sharemd-draft', JSON.stringify(draft));
+			await goto('/');
+		} catch {
+			flash('Could not fork document.');
+		}
+	}
+
+	async function copyMarkdown() {
+		if (data.rawMarkdown && (await copyText(data.rawMarkdown))) {
+			flash('Markdown copied to clipboard.');
+		} else {
+			flash('Copy failed. Try downloading .md instead.');
+		}
+	}
 	async function unlock() {
 		pwError = null;
 		unlockTried = false;
@@ -128,6 +240,7 @@
 	});
 
 	onMount(() => {
+		isOwner = owns(data.id);
 		// Link theme override (?theme=): session-only, viewer storage untouched.
 		// The init script already painted it pre-paint; sync state here.
 		const override = getThemeFromUrl(window.location.search);
@@ -318,15 +431,36 @@
 			</p>
 		</div>
 		<div class="flex shrink-0 items-center gap-1.5 print:hidden">
+			{#if isOwner}
+				<button
+					onclick={startEditing}
+					class="border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+				>
+					{editing ? 'Cancel edit' : 'Edit'}
+				</button>
+			{:else}
+				<button
+					onclick={forkDoc}
+					class="border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+				>
+					Fork
+				</button>
+			{/if}
+			<button
+				onclick={copyMarkdown}
+				class="border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+			>
+				Copy MD
+			</button>
 			<button
 				onclick={copyLink}
-				class=" border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+				class="border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
 			>
 				Copy link
 			</button>
 			<a
 				href={themedRawPath}
-				class=" border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+				class="border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
 			>
 				Raw
 			</a>
@@ -369,18 +503,67 @@
 <!-- article -->
 <main class="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10 lg:max-w-7xl">
 	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-12">
-			<div class="min-w-0">
-			<article
-				bind:this={articleEl}
-				use:codeCopy
-				class="prose prose-share rise max-w-none sm:prose-lg dark:prose-invert"
-			>
-				{@html data.html}
-			</article>
-			<div class="mt-10 flex items-center justify-between gap-3 border border-line bg-surface px-4 py-3 dark:border-night-line dark:bg-night-surface">
-				<p class="text-[13px] text-ink-soft dark:text-slate-500">Unlisted. Anyone with the link can read.</p>
-				<a href="/" class="shrink-0 text-sm font-medium text-iris hover:underline hover:underline-offset-2">Share your own →</a>
-			</div>
+		<div class="min-w-0">
+			{#if editing}
+				<div class="border border-line bg-surface p-4 sm:p-6 dark:border-night-line dark:bg-night-surface">
+					<div class="mb-4">
+						<label class="mb-1.5 block text-sm font-medium" for="edit-title">Title</label>
+						<input
+							id="edit-title"
+							bind:value={editTitle}
+							maxlength="200"
+							placeholder="Document title"
+							class="w-full border border-line bg-paper px-3.5 py-2.5 text-[15px] font-medium placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night"
+						/>
+					</div>
+					<div class="mb-4">
+						<label class="mb-1.5 flex items-baseline justify-between text-sm font-medium" for="edit-markdown">
+							Markdown
+							<span class="font-mono text-xs font-normal text-ink-soft dark:text-slate-500">Cmd+Enter to save</span>
+						</label>
+						<textarea
+							id="edit-markdown"
+							bind:value={editMarkdown}
+							onkeydown={onEditKeyDown}
+							rows="18"
+							spellcheck="false"
+							class="w-full border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night"
+						></textarea>
+					</div>
+					{#if editError}
+						<p class="mb-3 text-sm text-red-500">{editError}</p>
+					{/if}
+					<div class="flex items-center gap-2">
+						<button
+							type="button"
+							onclick={saveEdit}
+							disabled={editBusy}
+							class="btn-accent px-5 py-2 text-sm font-semibold transition disabled:opacity-50"
+						>
+							{editBusy ? 'Saving…' : 'Save changes'}
+						</button>
+						<button
+							type="button"
+							onclick={() => (editing = false)}
+							class="border border-line px-4 py-2 text-sm font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+						>
+							Cancel
+						</button>
+					</div>
+				</div>
+			{:else}
+				<article
+					bind:this={articleEl}
+					use:codeCopy
+					class="prose prose-share rise max-w-none sm:prose-lg dark:prose-invert"
+				>
+					{@html data.html}
+				</article>
+				<div class="mt-10 flex items-center justify-between gap-3 border border-line bg-surface px-4 py-3 dark:border-night-line dark:bg-night-surface">
+					<p class="text-[13px] text-ink-soft dark:text-slate-500">Unlisted. Anyone with the link can read.</p>
+					<a href="/" class="shrink-0 text-sm font-medium text-iris hover:underline hover:underline-offset-2">Share your own →</a>
+				</div>
+			{/if}
 		</div>
 		<TocRail items={toc} activeId={activeId} />
 	</div>

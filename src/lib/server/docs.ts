@@ -56,3 +56,13 @@ export function deleteDoc(docId: string): boolean {
 	const res = db.delete(documents).where(eq(documents.id, docId)).run();
 	return res.changes > 0;
 }
+
+/** Update a doc's title, markdown, and rendered HTML by id. Returns true when updated. */
+export function updateDoc(docId: string, title: string, rawMarkdown: string, html: string): boolean {
+	const res = db
+		.update(documents)
+		.set({ title, rawMarkdown, html })
+		.where(eq(documents.id, docId))
+		.run();
+	return res.changes > 0;
+}

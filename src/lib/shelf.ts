@@ -82,6 +82,21 @@ export function owns(id: string): boolean {
 	return load().some((e) => e.id === id);
 }
 
+/** Return the delete/edit token for an owned doc id, or null if not owned. */
+export function getOwnedToken(id: string): string | null {
+	return load().find((e) => e.id === id)?.token ?? null;
+}
+
+/** Update the title of an owned doc on the shelf. */
+export function updateShelfTitle(id: string, newTitle: string): void {
+	const entries = load();
+	const target = entries.find((e) => e.id === id);
+	if (target) {
+		target.title = newTitle;
+		save(entries);
+	}
+}
+
 /** Record a share. Dedupes by id, newest first, capped at 100. */
 export function addToShelf(entry: ShelfEntry): void {
 	const rest = load().filter((e) => e.id !== entry.id);
