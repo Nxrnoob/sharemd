@@ -497,6 +497,35 @@ html:not(.dark) .code-copy-btn {
 	color: var(--color-ink);
 }
 
+/* ---------- task list checkboxes ---------- */
+article.prose input[type='checkbox'] {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 14px;
+	height: 14px;
+	border: 1px solid var(--color-line);
+	background: var(--color-surface);
+	display: inline-grid;
+	place-content: center;
+	vertical-align: -2px;
+	margin-right: 0.5rem;
+	cursor: default;
+}
+article.prose input[type='checkbox']:checked {
+	background: var(--color-iris);
+	border-color: var(--color-iris);
+}
+article.prose input[type='checkbox']:checked::before {
+	content: '';
+	width: 6px;
+	height: 6px;
+	background: var(--color-paper);
+}
+article.prose ul:has(> li > input[type='checkbox']) {
+	list-style-type: none;
+	padding-left: 0;
+}
+
 /* ---------- shiki dual theme ----------
    Server stores one HTML blob highlighted with both themes
    (themes: { light, dark }). These selectors pick the right one

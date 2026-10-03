@@ -73,6 +73,22 @@ marked.use({
 	}
 });
 
+DOMPurify.addHook('afterSanitizeElements', (node) => {
+	if (node.nodeName === 'INPUT' && (node as HTMLInputElement).type !== 'checkbox') {
+		node.parentNode?.removeChild(node);
+	}
+});
+
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+	if (node.nodeName === 'A') {
+		const href = node.getAttribute('href') || '';
+		if (href.startsWith('http://') || href.startsWith('https://')) {
+			node.setAttribute('target', '_blank');
+			node.setAttribute('rel', 'noopener noreferrer');
+		}
+	}
+});
+
 /**
  * Server-only: pre-render markdown to sanitized HTML at POST time.
  * Stored in `documents.html`; view routes must NOT re-parse.
@@ -80,7 +96,7 @@ marked.use({
 export async function renderMarkdown(raw: string): Promise<string> {
 	const dirty = (await marked.parse(raw, { async: true })) as string;
 	return DOMPurify.sanitize(dirty, {
-		ADD_ATTR: ['target', 'class', 'style'],
-		ADD_TAGS: ['span']
+		ADD_ATTR: ['target', 'class', 'style', 'type', 'disabled', 'checked', 'rel'],
+		ADD_TAGS: ['span', 'input']
 	});
 }
