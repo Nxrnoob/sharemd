@@ -1,5 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	// Scribble face: Caveat 600, self-hosted via Fontsource (OFL),
+	// bundled by Vite — zero external requests. Imported here (not
+	// globally) so the woff2 only ever ships on the landing chunk.
+	import '@fontsource/caveat/latin-600.css';
 	import { createLetterField, LETTER_FIELD_CANVAS_CSS } from '../../../art/letter-field.js';
 
 	// Letter Field — ghost letters of what the user types.

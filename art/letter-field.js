@@ -2,8 +2,17 @@
  * Letter Field — ghost letters of what the user actually types.
  *
  * A dependency-free canvas-2D sketch factory. Each planted character
- * becomes one faint glyph near the editor; glyphs fade over seconds and
- * an idle page returns to empty. See art/letter-field.md for the movement.
+ * becomes one faint scribble glyph scattered across the viewport
+ * background; glyphs fade over seconds and an idle page returns to empty.
+ * See art/letter-field.md for the movement.
+ *
+ * Type: glyphs set in the Caveat scribble face (self-hosted via
+ * Fontsource, OFL), loaded by the host component. The factory warms the
+ * face with an explicit FontFace load at creation and repaints static
+ * glyphs when document.fonts becomes ready, so canvas text uses Caveat
+ * after load and a handwriting fallback before it. The motion path needs
+ * no extra work: it repaints every frame, so the face swaps in on its own
+ * the moment it arrives.
  *
  * Layering contract (HARD-WON RULE): `body` paints opaque
  * `background: var(--color-paper)`, so the canvas MUST composite above it
@@ -12,9 +21,10 @@
  * The canvas itself is fully transparent — it is cleared, never filled —
  * so the page ground shows through everywhere no glyph sits.
  *
- * Randomness: one seeded mulberry32 stream drives glyph jitter, rotation,
- * size, lifespan and the rare accent. Same seed, same sequence; the field
- * is a texture of the input, never a surprise generator.
+ * Randomness: one seeded mulberry32 stream drives glyph position,
+ * jitter, rotation, size, lifespan and the rare accent. Same seed, same
+ * sequence; the field is a texture of the input, never a surprise
+ * generator.
  */
 
 /**
@@ -161,55 +171,97 @@ export function createLetterField(canvas, options = {}) {
 	let hiddenAt = 0;
 
 	/**
-	 * Sample a point in a halo around the editor and push it clear of the
-	 * opaque panel, so every glyph lands on visible page ground instead of
-	 * hiding under the machine (or over the real text being typed).
+	 * Opaque rectangles ghost marks must avoid, in CSS pixels: the editor
+	 * panel (marks behind it are wasted pixels) and the site header
+	 * (translucent over blur — ghosts behind it would only smear).
+	 *
+	 * @returns {Array<{ left: number, top: number, right: number, bottom: number }>}
+	 */
+	function currentSolids() {
+		/** @type {Array<{ left: number, top: number, right: number, bottom: number }>} */
+		const solids = [];
+		const panel = document.querySelector('.paper-stack');
+		if (panel instanceof Element) {
+			const r = panel.getBoundingClientRect();
+			if (r.width > 4 && r.height > 4)
+				solids.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+		}
+		const header = document.querySelector('header.site-header');
+		if (header instanceof Element) {
+			const r = header.getBoundingClientRect();
+			if (r.width > 4 && r.height > 4)
+				solids.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+		}
+		return solids;
+	}
+
+	/**
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {Array<{ left: number, top: number, right: number, bottom: number }>} solids
+	 * @param {number} m
+	 * @returns {boolean}
+	 */
+	function hitsSolid(x, y, solids, m) {
+		for (const s of solids) {
+			if (x > s.left - m && x < s.right + m && y > s.top - m && y < s.bottom + m)
+				return true;
+		}
+		return false;
+	}
+
+	/**
+	 * @param {number} x
+	 * @param {number} y
+	 * @param {{ left: number, top: number, right: number, bottom: number }} s
+	 * @param {number} m
+	 * @returns {{ x: number, y: number }}
+	 */
+	function pushClear(x, y, s, m) {
+		const dl = Math.abs(x - (s.left - m));
+		const dr = Math.abs(s.right + m - x);
+		const dt = Math.abs(y - (s.top - m));
+		const db = Math.abs(s.bottom + m - y);
+		const pick = Math.min(dl, dr, dt, db);
+		if (pick === dl) x = s.left - m;
+		else if (pick === dr) x = s.right + m;
+		else if (pick === dt) y = s.top - m;
+		else y = s.bottom + m;
+		return { x, y };
+	}
+
+	/**
+	 * Sample a point uniformly across the whole viewport background —
+	 * margins, rail whitespace, above and below the panel — resampling
+	 * until clear ground is found. Tries are capped; the last resort
+	 * pushes out of the panel so a glyph never lands on the real text
+	 * being typed. Density is unchanged (same live-glyph cap): spread
+	 * wider, never denser.
 	 *
 	 * @returns {{ x: number, y: number }}
 	 */
-	function placeNearEditor() {
+	function placeOnClearGround() {
 		const vw = window.innerWidth;
 		const vh = window.innerHeight;
-		const ta = document.querySelector('textarea');
-		const panel = document.querySelector('.paper-stack');
-		const taRect = ta instanceof HTMLTextAreaElement ? ta.getBoundingClientRect() : null;
-		const panelRect = panel instanceof Element ? panel.getBoundingClientRect() : taRect;
-		if (!taRect || taRect.width < 4 || taRect.height < 4) {
-			return {
-				x: 16 + rand() * Math.max(32, vw - 32),
-				y: 16 + rand() * Math.max(32, vh - 32)
-			};
+		const spanX = Math.max(40, vw - 40);
+		const spanY = Math.max(40, vh - 40);
+		const solids = currentSolids();
+		const m = 14;
+		let x = 20 + rand() * spanX;
+		let y = 20 + rand() * spanY;
+		for (let t = 0; t < 10 && hitsSolid(x, y, solids, m); t++) {
+			x = 20 + rand() * spanX;
+			y = 20 + rand() * spanY;
 		}
-		const cx = taRect.left + taRect.width / 2;
-		const cy = taRect.top + taRect.height / 2;
-		const angle = rand() * Math.PI * 2;
-		const radius = 90 + rand() * 230;
-		let x = cx + Math.cos(angle) * radius * 1.25 + (rand() - 0.5) * 70;
-		let y = cy + Math.sin(angle) * radius * 0.85 + (rand() - 0.5) * 70;
-		x = clamp(x, 14, Math.max(28, vw - 14));
-		y = clamp(y, 14, Math.max(28, vh - 14));
-		if (panelRect && panelRect.width > 4 && panelRect.height > 4) {
-			const m = 16;
-			const inside =
-				x > panelRect.left - m &&
-				x < panelRect.right + m &&
-				y > panelRect.top - m &&
-				y < panelRect.bottom + m;
-			if (inside) {
-				const dl = Math.abs(x - (panelRect.left - m));
-				const dr = Math.abs(panelRect.right + m - x);
-				const dt = Math.abs(y - (panelRect.top - m));
-				const db = Math.abs(panelRect.bottom + m - y);
-				const pick = Math.min(dl, dr, dt, db);
-				if (pick === dl) x = panelRect.left - m;
-				else if (pick === dr) x = panelRect.right + m;
-				else if (pick === dt) y = panelRect.top - m;
-				else y = panelRect.bottom + m;
-				x = clamp(x, 14, Math.max(28, vw - 14));
-				y = clamp(y, 14, Math.max(28, vh - 14));
-			}
+		if (solids.length && hitsSolid(x, y, solids, m)) {
+			const out = pushClear(x, y, solids[0], m);
+			x = out.x;
+			y = out.y;
 		}
-		return { x, y };
+		return {
+			x: clamp(x, 14, Math.max(28, vw - 14)),
+			y: clamp(y, 14, Math.max(28, vh - 14))
+		};
 	}
 
 	/**
@@ -224,9 +276,9 @@ export function createLetterField(canvas, options = {}) {
 		ctx.translate(g.x, g.y);
 		ctx.rotate(g.rot);
 		ctx.font =
-			'700 ' +
+			'600 ' +
 			Math.round(g.size) +
-			'px "Sentient", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+			'px "Caveat", "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive';
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
 		ctx.fillStyle = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
@@ -281,7 +333,7 @@ export function createLetterField(canvas, options = {}) {
 		if (!chars.length) return;
 		const now = performance.now();
 		for (const ch of chars) {
-			const p = placeNearEditor();
+			const p = placeOnClearGround();
 			const isAccent = rand() < 1 / 12;
 			/** @type {Glyph} */
 			const g = {
@@ -381,11 +433,24 @@ export function createLetterField(canvas, options = {}) {
 
 	readThemeColors();
 	resize();
-	// Warm the display face so early glyphs already set in Sentient;
-	// the mono fallback below still sets if the face arrives late.
+	// Warm the scribble face with an explicit load, before any plant can
+	// need it; the handwriting fallback in paintGlyph still sets if the
+	// face arrives late. Motion frames pick Caveat up on their own the
+	// moment it lands; static glyphs repaint below when fonts go ready.
 	try {
-		const pending = document.fonts.load('700 40px "Sentient"');
-		if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+		if (typeof document.fonts.check === 'function' && !document.fonts.check('600 40px "Caveat"')) {
+			const pending = document.fonts.load('600 40px "Caveat"');
+			if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+		}
+		const ready = document.fonts.ready;
+		if (ready && typeof ready.then === 'function') {
+			ready.then(
+				() => {
+					if (reduced) repaintStatic();
+				},
+				() => {}
+			);
+		}
 	} catch {
 		/* decorative: fallback stack still sets */
 	}
