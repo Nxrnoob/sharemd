@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import Toast from '$lib/components/Toast.svelte';
-	import AmbientCanvas from '$lib/components/AmbientCanvas.svelte';
 	import CoverArt from '$lib/components/CoverArt.svelte';
 	import { copyText } from '$lib/clipboard';
 	import { buildThemedUrl, isThemeId, DEFAULT_THEME_ID } from '$lib/themes';
@@ -23,8 +22,6 @@
 	// Whole-panel drop target: files can land anywhere on the machine.
 	let panelEl: HTMLElement | null = $state(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
-	// Ambient ink field: bound for keystroke echoes (see pulseInk).
-	let ambient: { pulse: (nx: number, ny: number) => void } | null = $state(null);
 
 	// Link options (sent only when set; backend ignores unknowns until its lane lands).
 	let optionsOpen = $state(false);
@@ -64,19 +61,6 @@
 	function onMarkdownInput(v: string) {
 		markdown = v;
 		autoTitle(v);
-		pulseInk();
-	}
-
-	// Keystroke echo: nudge the ambient field from somewhere inside the
-	// textarea's box. The factory throttles; reduced motion no-ops there.
-	function pulseInk() {
-		const el = textareaEl;
-		if (!ambient || !el) return;
-		const r = el.getBoundingClientRect();
-		if (r.width === 0 || r.height === 0) return;
-		const nx = (r.left + r.width * (0.25 + Math.random() * 0.5)) / window.innerWidth;
-		const ny = (r.top + r.height * (0.25 + Math.random() * 0.5)) / window.innerHeight;
-		ambient.pulse(nx, ny);
 	}
 
 	function focusEditor() {
@@ -243,8 +227,6 @@
 		if (e.key === 'Escape' && optionsOpen) closeOptions();
 	}}
 />
-
-<AmbientCanvas bind:this={ambient} />
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
 	<div class="grid gap-8 lg:h-full lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12">

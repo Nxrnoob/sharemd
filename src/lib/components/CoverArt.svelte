@@ -37,7 +37,6 @@
 
 	// Trailing debounce: rapid theme preview hovers fire data-theme
 	// mutations many times per second; only the settled theme repaints.
-	// Same pattern as AmbientCanvas, minus the animation loop.
 	function scheduleRepaint() {
 		if (themeTimer) clearTimeout(themeTimer);
 		themeTimer = setTimeout(() => {
