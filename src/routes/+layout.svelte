@@ -36,7 +36,10 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<div class="flex min-h-dvh flex-col">
+<!-- Letter Field layering: this stacking context paints above the fixed
+     body-level ghost-letter canvas (z-0), which itself composites above the
+     opaque body background. See art/letter-field.js. -->
+<div class="relative z-10 flex min-h-dvh flex-col">
 	<header
 		class="site-header z-30 border-b border-line bg-paper/85 backdrop-blur transition-transform duration-300 dark:border-night-line dark:bg-night/85 {isReader
 			? 'sticky top-0'

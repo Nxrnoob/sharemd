@@ -1,0 +1,7 @@
+# Letter Field
+
+The background of the landing page is a field that only the user's own typing can disturb. Every printable keystroke plants its literal character as a faint glyph near the editor; pastes plant a short burst of theirs; deletions plant nothing. Each glyph holds for a few seconds and then fades, so an idle page returns to empty paper. The art is the input — nothing is drawn that the user did not write.
+
+Computationally the piece is a raw canvas-2D sketch with no dependencies: a single seeded mulberry32 stream decides each glyph's jitter, rotation, size, lifespan, and whether it takes the rare accent, while position is sampled in a halo around the editor and pushed clear of the opaque panel so every mark lands on visible ground. Glyphs are set in the Sentient display face with a mono fallback, ink at alpha around two-tenths, quiet enough to sit under all ten themes including the light Latte ground. A requestAnimationFrame loop fades the living glyphs and stops dead when none remain; the loop pauses while the tab hides, and the canvas refits on resize.
+
+Restraint is the whole point: counts are capped per event and in total (tighter on coarse pointers), whitespace and control characters never plant, and theme changes only re-tint — never reseed — the field. When the user prefers reduced motion the loop never starts and each letter simply appears once at its final alpha and stays. If the first heading is still the loudest thing on screen, the field is tuned right.

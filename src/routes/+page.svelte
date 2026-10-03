@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import Toast from '$lib/components/Toast.svelte';
 	import CoverArt from '$lib/components/CoverArt.svelte';
+	import LetterField from '$lib/components/LetterField.svelte';
 	import { copyText } from '$lib/clipboard';
 	import { buildThemedUrl, isThemeId, DEFAULT_THEME_ID } from '$lib/themes';
 	import type { ThemeId } from '$lib/themes';
@@ -19,6 +20,10 @@
 	let toast = $state<{ message: string; kind: 'ok' | 'error'; link?: string | null } | null>(null);
 	let fileInput: HTMLInputElement | null = $state(null);
 	let textareaEl: HTMLTextAreaElement | null = $state(null);
+	// Letter Field: imperatively-planted ghost glyphs of the user's own
+	// input (body-level canvas, decorative only — never blocks input).
+	let letterField: { plant: (text: string) => void } | null = $state(null);
+	let lastFieldPlant = 0;
 	// Whole-panel drop target: files can land anywhere on the machine.
 	let panelEl: HTMLElement | null = $state(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -61,6 +66,44 @@
 	function onMarkdownInput(v: string) {
 		markdown = v;
 		autoTitle(v);
+	}
+
+	// Letter Field wiring: keystrokes pass their ACTUAL character from the
+	// input event (printable chars only, burst-capped per event, 40ms gate
+	// for single keystrokes); pastes pass up to N chars per event and skip
+	// the gate; backspace/delete/cut/undo plant nothing.
+	function plantFromEditorInput(e: Event) {
+		const input = e as InputEvent;
+		const type = typeof input.inputType === 'string' ? input.inputType : '';
+		if (type.startsWith('delete') || type === 'historyUndo' || type === 'historyRedo') return;
+		const raw = typeof input.data === 'string' ? input.data : null;
+		if (!raw) return;
+		const coarse =
+			typeof window !== 'undefined' &&
+			(window.matchMedia('(pointer: coarse)').matches ||
+				Math.min(window.innerWidth, window.innerHeight) < 560);
+		const chars = [...raw]
+			.filter((ch) => {
+				if (ch.trim() === '') return false;
+				const cp = ch.codePointAt(0);
+				return typeof cp === 'number' && cp > 31 && cp !== 127;
+			})
+			.slice(0, coarse ? 6 : 12)
+			.join('');
+		if (!chars) return;
+		const now = performance.now();
+		if (chars.length === 1 && now - lastFieldPlant < 40) return;
+		lastFieldPlant = now;
+		try {
+			letterField?.plant(chars);
+		} catch {
+			/* decorative only: input must never fail because art did */
+		}
+	}
+
+	function onEditorInput(e: Event & { currentTarget: HTMLTextAreaElement }) {
+		plantFromEditorInput(e);
+		onMarkdownInput(e.currentTarget.value);
 	}
 
 	function focusEditor() {
@@ -229,6 +272,9 @@
 />
 
 <main class="landing-lock mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-0">
+	<!-- Letter Field: body-level ghost-letter canvas (imperatively mounted,
+	     aria-hidden, pointer-transparent). Landing only — reader untouched. -->
+	<LetterField bind:this={letterField} />
 	<div class="grid gap-8 lg:h-full lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-12">
 		<!-- left: headline + subtext + cta + recent, one flowing centered
 		   column (a7f6b35 geometry). On phones the section dissolves via
@@ -358,7 +404,7 @@
 						<textarea
 							bind:this={textareaEl}
 							value={markdown}
-							oninput={(e) => onMarkdownInput(e.currentTarget.value)}
+							oninput={onEditorInput}
 							rows="6"
 							placeholder="# Type or drop a file. Headings, tables, tasks, code."
 							spellcheck="false"
