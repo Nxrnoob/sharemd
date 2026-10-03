@@ -2,6 +2,7 @@ import { Marked, type Tokens } from 'marked';
 import { gfmHeadingId } from 'marked-gfm-heading-id';
 import DOMPurify from 'isomorphic-dompurify';
 import { getSingletonHighlighter, type Highlighter } from 'shiki';
+import katex from 'katex';
 
 export const MAX_MARKDOWN_BYTES = 512 * 1024;
 
@@ -25,6 +26,53 @@ function getHighlighter(): Promise<Highlighter> {
 const marked = new Marked(gfmHeadingId({ prefix: 'user-content-' }));
 
 marked.use({
+	extensions: [
+		{
+			name: 'blockMath',
+			level: 'block',
+			start(src: string) {
+				return src.indexOf('$$');
+			},
+			tokenizer(src: string) {
+				const match = src.match(/^\$\$([\s\S]+?)\$\$(?:\n|$)/);
+				if (match) {
+					return {
+						type: 'blockMath',
+						raw: match[0],
+						text: match[1].trim()
+					};
+				}
+				return undefined;
+			},
+			renderer(token: Tokens.Generic) {
+				const mathText = typeof token.text === 'string' ? token.text : '';
+				const rendered = katex.renderToString(mathText, { displayMode: true, throwOnError: false });
+				return `<div class="katex-display">${rendered}</div>\n`;
+			}
+		},
+		{
+			name: 'inlineMath',
+			level: 'inline',
+			start(src: string) {
+				return src.indexOf('$');
+			},
+			tokenizer(src: string) {
+				const match = src.match(/^\$([\S](?:[\s\S]*?[\S])?)\$(?!\d)/);
+				if (match) {
+					return {
+						type: 'inlineMath',
+						raw: match[0],
+						text: match[1].trim()
+					};
+				}
+				return undefined;
+			},
+			renderer(token: Tokens.Generic) {
+				const mathText = typeof token.text === 'string' ? token.text : '';
+				return katex.renderToString(mathText, { displayMode: false, throwOnError: false });
+			}
+		}
+	],
 	async walkTokens(token) {
 		if (token.type === 'code') {
 			const codeToken = token as { text: string; lang?: string };
@@ -116,7 +164,34 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 export async function renderMarkdown(raw: string): Promise<string> {
 	const dirty = (await marked.parse(raw, { async: true })) as string;
 	return DOMPurify.sanitize(dirty, {
-		ADD_ATTR: ['target', 'class', 'style', 'type', 'disabled', 'checked', 'rel'],
-		ADD_TAGS: ['span', 'input']
+		ADD_ATTR: [
+			'target',
+			'class',
+			'style',
+			'type',
+			'disabled',
+			'checked',
+			'rel',
+			'aria-hidden',
+			'viewBox',
+			'd',
+			'xmlns',
+			'display',
+			'encoding'
+		],
+		ADD_TAGS: [
+			'span',
+			'input',
+			'math',
+			'semantics',
+			'mrow',
+			'mi',
+			'mo',
+			'mn',
+			'annotation',
+			'svg',
+			'path',
+			'line'
+		]
 	});
 }
