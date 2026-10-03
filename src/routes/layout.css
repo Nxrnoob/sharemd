@@ -526,6 +526,44 @@ article.prose ul:has(> li > input[type='checkbox']) {
 	padding-left: 0;
 }
 
+/* ---------- callouts / alerts ---------- */
+article.prose .callout {
+	margin: 1.5rem 0;
+	padding: 0.875rem 1rem;
+	border: 1px solid var(--color-line);
+	border-left: 3px solid var(--color-iris);
+	background: var(--color-surface);
+}
+article.prose .callout-note {
+	border-left-color: var(--color-iris);
+}
+article.prose .callout-tip {
+	border-left-color: #10b981;
+}
+article.prose .callout-important {
+	border-left-color: #a855f7;
+}
+article.prose .callout-warning {
+	border-left-color: #f59e0b;
+}
+article.prose .callout-caution {
+	border-left-color: #ef4444;
+}
+article.prose .callout-title {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	color: var(--color-ink-soft);
+	margin-bottom: 0.375rem;
+}
+article.prose .callout-body > p:first-child {
+	margin-top: 0;
+}
+article.prose .callout-body > p:last-child {
+	margin-bottom: 0;
+}
+
 /* ---------- shiki dual theme ----------
    Server stores one HTML blob highlighted with both themes
    (themes: { light, dark }). These selectors pick the right one

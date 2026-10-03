@@ -1,4 +1,4 @@
-import { Marked } from 'marked';
+import { Marked, type Tokens } from 'marked';
 import { gfmHeadingId } from 'marked-gfm-heading-id';
 import DOMPurify from 'isomorphic-dompurify';
 import { getSingletonHighlighter, type Highlighter } from 'shiki';
@@ -69,12 +69,32 @@ marked.use({
 				.replace(/</g, '&lt;')
 				.replace(/>/g, '&gt;');
 			return `<pre><code>${escaped}</code></pre>\n`;
+		},
+		blockquote(token: Tokens.Blockquote): string {
+			const firstToken = token.tokens[0];
+			const text = firstToken && 'text' in firstToken && typeof firstToken.text === 'string' ? firstToken.text : '';
+			const match = text.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*\n?([\s\S]*)$/i);
+			if (match) {
+				const kind = match[1].toLowerCase();
+				if (firstToken && 'tokens' in firstToken && Array.isArray(firstToken.tokens)) {
+					const inlineFirst = firstToken.tokens[0];
+					if (inlineFirst && inlineFirst.type === 'text' && typeof inlineFirst.text === 'string') {
+						inlineFirst.text = inlineFirst.text.replace(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*\n?/i, '');
+						if ('raw' in inlineFirst && typeof inlineFirst.raw === 'string') {
+							inlineFirst.raw = inlineFirst.raw.replace(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*\n?/i, '');
+						}
+					}
+				}
+				const body = this.parser.parse(token.tokens);
+				return `<div class="callout callout-${kind}"><div class="callout-title">${kind.toUpperCase()}</div><div class="callout-body">${body}</div></div>\n`;
+			}
+			return `<blockquote>${this.parser.parse(token.tokens)}</blockquote>\n`;
 		}
 	}
 });
 
 DOMPurify.addHook('afterSanitizeElements', (node) => {
-	if (node.nodeName === 'INPUT' && (node as HTMLInputElement).type !== 'checkbox') {
+	if (node.nodeName === 'INPUT' && 'type' in node && node.type !== 'checkbox') {
 		node.parentNode?.removeChild(node);
 	}
 });
