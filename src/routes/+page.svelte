@@ -35,9 +35,50 @@
 
 	// Whole-panel drop target: files can land anywhere on the machine.
 	let panelEl: HTMLElement | null = $state(null);
+	const DRAFT_KEY = 'sharemd-draft';
+	let draftTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function saveDraft(t: string, md: string) {
+		if (typeof localStorage === 'undefined') return;
+		if (draftTimer) clearTimeout(draftTimer);
+		draftTimer = setTimeout(() => {
+			if (!t.trim() && !md.trim()) {
+				try {
+					localStorage.removeItem(DRAFT_KEY);
+				} catch {}
+			} else {
+				try {
+					localStorage.setItem(DRAFT_KEY, JSON.stringify({ title: t, markdown: md }));
+				} catch {}
+			}
+		}, 300);
+	}
+
+	function clearDraft() {
+		if (draftTimer) clearTimeout(draftTimer);
+		if (typeof localStorage !== 'undefined') {
+			try {
+				localStorage.removeItem(DRAFT_KEY);
+			} catch {}
+		}
+	}
 
 	onMount(() => {
 		shelfIds = new Set(getShelf().map((e) => e.id));
+		try {
+			const saved = localStorage.getItem(DRAFT_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved) as { title?: unknown; markdown?: unknown };
+				if (typeof parsed.markdown === 'string' && parsed.markdown.trim()) {
+					markdown = parsed.markdown;
+					if (typeof parsed.title === 'string' && parsed.title.trim()) {
+						title = parsed.title;
+						titleTouched = true;
+					}
+					showToast('Draft restored from your last visit.');
+				}
+			}
+		} catch {}
 	});
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -94,6 +135,7 @@
 	function onMarkdownInput(v: string) {
 		markdown = v;
 		autoTitle(v);
+		saveDraft(title, v);
 	}
 
 	// Letter Field wiring: keystrokes pass their ACTUAL character from the
@@ -279,6 +321,7 @@
 					/* shelf is best-effort; the share already succeeded */
 				}
 			}
+			clearDraft();
 			const saved = typeof document !== 'undefined' ? document.documentElement.dataset.theme : null;
 			const themeId: ThemeId = isThemeId(saved) ? saved : DEFAULT_THEME_ID;
 			const url = buildThemedUrl(typeof out.url === 'string' && out.url ? out.url : `/s/${out.id}`, themeId);
@@ -472,7 +515,10 @@
 						</span>
 						<input
 							bind:value={title}
-							oninput={() => (titleTouched = true)}
+							oninput={() => {
+								titleTouched = true;
+								saveDraft(title, markdown);
+							}}
 							maxlength="200"
 							placeholder="e.g. Deploy notes for Friday"
 							autocomplete="off"
