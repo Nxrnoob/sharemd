@@ -99,6 +99,17 @@
 		}
 	}
 
+	function toDownloadFilename(title: string | null | undefined, fallback: string): string {
+		const slug = (title || '')
+			.toLowerCase()
+			.trim()
+			.replace(/[*_`~\[\]()!#]/g, '')
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, '')
+			.slice(0, 60);
+		return `${slug || fallback}.md`;
+	}
+
 	async function download() {
 		try {
 			const res = await fetch(themedRawPath);
@@ -107,13 +118,13 @@
 			const blob = new Blob([text], { type: 'text/markdown' });
 			const a = document.createElement('a');
 			a.href = URL.createObjectURL(blob);
-			a.download = `${data.id}.md`;
+			a.download = toDownloadFilename(data.title || data.slug, data.id);
 			document.body.appendChild(a);
 			a.click();
 			a.remove();
 			setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 		} catch {
-			flash('Download failed. Try the raw link instead.');
+			flash('Download failed. Please try again.');
 		}
 	}
 
