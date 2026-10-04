@@ -46,6 +46,7 @@
 	let editMarkdown = $state('');
 	let editBusy = $state(false);
 	let editError = $state<string | null>(null);
+	let scrolledPastHeader = $state(false);
 
 	type LoadFlags = { passwordRequired?: boolean; gone?: boolean };
 	const flags = $derived((data ?? {}) as typeof data & LoadFlags);
@@ -65,6 +66,17 @@
 		articleEl?.innerText.slice(0, 160).replace(/\s+/g, ' ').trim() ||
 			`${data.title}. Shared with ShareMD.`
 	);
+
+	const hasArticleH1 = $derived(
+		Boolean(
+			data.html &&
+			toc.length > 0 &&
+			toc[0].level === 1 &&
+			(toc[0].text.toLowerCase() === (data.title || '').trim().toLowerCase() ||
+			 (data.title || '').trim().toLowerCase().startsWith(toc[0].text.toLowerCase()))
+		)
+	);
+	const showTopBarTitle = $derived(!hasArticleH1 || scrolledPastHeader);
 
 	function flash(msg: string) {
 		if (toastTimer) clearTimeout(toastTimer);
@@ -241,6 +253,11 @@
 
 	onMount(() => {
 		isOwner = owns(data.id);
+		const handleScroll = () => {
+			scrolledPastHeader = window.scrollY > 90;
+		};
+		window.addEventListener('scroll', handleScroll, { passive: true });
+		handleScroll();
 		// Link theme override (?theme=): session-only, viewer storage untouched.
 		// The init script already painted it pre-paint; sync state here.
 		const override = getThemeFromUrl(window.location.search);
@@ -262,6 +279,7 @@
 		});
 		themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 		return () => {
+			window.removeEventListener('scroll', handleScroll);
 			themeObs.disconnect();
 			delete document.documentElement.dataset.tocOpen;
 		};
@@ -425,8 +443,12 @@
 <div class="border-b border-line bg-surface/80 backdrop-blur dark:border-night-line dark:bg-night-surface/80">
 	<div class="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 lg:max-w-7xl">
 		<div class="min-w-0 flex-1">
-			<h1 class="font-display truncate text-[17px] font-semibold tracking-tight">{data.title}</h1>
-			<p class="mt-0.5 font-mono text-[11px] text-ink-soft dark:text-slate-500">
+			{#if showTopBarTitle}
+				<h1 class="font-display truncate text-[17px] font-semibold tracking-tight transition-opacity duration-200">
+					{data.title}
+				</h1>
+			{/if}
+			<p class="font-mono text-[11px] text-ink-soft dark:text-slate-500 {showTopBarTitle ? 'mt-0.5' : ''}">
 				{dateLabel} · {data.views} {data.views === 1 ? 'view' : 'views'} · {data.readTime}
 			</p>
 		</div>
