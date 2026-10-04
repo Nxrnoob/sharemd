@@ -93,6 +93,13 @@ marked.use({
 			}
 			try {
 				const hl = await getHighlighter();
+				if (lang && !hl.getLoadedLanguages().includes(lang)) {
+					try {
+						await hl.loadLanguage(lang as never);
+					} catch {
+						// unknown language alias, fallback to plaintext
+					}
+				}
 				const loaded = hl.getLoadedLanguages();
 				const useLang = loaded.includes(lang) ? lang : 'plaintext';
 				codeToken.text = hl.codeToHtml(codeToken.text, {
