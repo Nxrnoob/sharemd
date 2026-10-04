@@ -40,7 +40,7 @@
 		onclick={scrollTop}
 		aria-label="Back to top"
 		title="Back to top"
-		class="fixed right-4 bottom-5 z-40 grid size-11 place-items-center rounded-none border border-line bg-surface/95 text-lg text-ink shadow-lg backdrop-blur transition hover:border-iris hover:text-iris sm:right-6 dark:border-night-line dark:bg-night-surface/95 dark:text-slate-200"
+		class="fixed right-4 bottom-5 z-40 grid size-11 place-items-center rounded-sm border border-line bg-surface/95 text-lg text-ink shadow-lg backdrop-blur transition hover:border-iris hover:text-iris sm:right-6 dark:border-night-line dark:bg-night-surface/95 dark:text-slate-200"
 	>
 		<span aria-hidden="true" class="-translate-y-px">↑</span>
 	</button>

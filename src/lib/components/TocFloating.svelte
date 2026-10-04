@@ -93,7 +93,7 @@
 			aria-haspopup="dialog"
 			aria-expanded={open}
 			aria-label={current ? `Table of contents, current section: ${current.text}` : 'Table of contents'}
-			class="flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-none border border-line bg-surface/95 py-2 pr-4 pl-3 shadow-lg backdrop-blur transition hover:border-iris sm:max-w-xs dark:border-night-line dark:bg-night-surface/95"
+			class="flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-sm border border-line bg-surface/95 py-2 pr-4 pl-3 shadow-lg backdrop-blur transition hover:border-iris sm:max-w-xs dark:border-night-line dark:bg-night-surface/95"
 		>
 			<span aria-hidden="true" class="font-display shrink-0 text-[15px] font-semibold text-iris">≡</span>
 			<span class="font-display truncate text-[13px] font-medium">{current?.text ?? 'Contents'}</span>

@@ -16,7 +16,7 @@
 			: 'border-line bg-ink text-white dark:border-night-line dark:bg-surface dark:text-ink'}"
 	>
 		<span
-			class="grid size-7 shrink-0 place-items-center rounded-none text-sm {kind === 'error'
+			class="grid size-7 shrink-0 place-items-center rounded-xs text-sm {kind === 'error'
 				? 'bg-red-100 dark:bg-red-950'
 				: 'btn-accent'}"
 			aria-hidden="true"
