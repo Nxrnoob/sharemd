@@ -4,6 +4,9 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import ThemePicker from '$lib/components/ThemePicker.svelte';
+	import HowItWorksModal from '$lib/components/HowItWorksModal.svelte';
+
+	let showGuide = $state(false);
 
 	let { children } = $props();
 
@@ -51,15 +54,23 @@
 						class="font-bold">MD</span></span
 				>
 			</a>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-1.5 sm:gap-2">
+				<button
+					type="button"
+					onclick={() => (showGuide = true)}
+					class="border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris sm:px-3 sm:text-sm"
+				>
+					<span class="sm:hidden">Guide</span>
+					<span class="hidden sm:inline">How it works</span>
+				</button>
 				<a
 					href="/"
-					class="border border-line px-3 py-1.5 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-iris"
+					class="border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris sm:px-3 sm:text-sm"
 					>New doc</a
 				>
 				<a
 					href="/library"
-					class="border border-line px-3 py-1.5 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-iris"
+					class="border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris sm:px-3 sm:text-sm"
 					>Library</a
 				>
 				<ThemePicker />
@@ -85,5 +96,6 @@
 			</a>
 		</div>
 	</footer>
+	<HowItWorksModal bind:open={showGuide} />
 </div>
 

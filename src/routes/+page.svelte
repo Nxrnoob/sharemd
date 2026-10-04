@@ -429,7 +429,7 @@
 					Paste the md your AI gave you and<br class="hidden lg:block" /> Read it beautifully here.
 				</h1>
 			</div>
-			<div class="rise rise-2 max-lg:order-3">
+			<div class="rise rise-2 flex flex-wrap items-center gap-2.5 max-lg:order-3">
 				<button
 					type="button"
 					onclick={focusEditor}
@@ -437,6 +437,13 @@
 				>
 					Start pasting
 					<span aria-hidden="true" class="transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-1">→</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => window.dispatchEvent(new CustomEvent('open-sharemd-guide'))}
+					class="border border-line px-4 py-2.5 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-ink active:scale-[0.98] dark:hover:text-white"
+				>
+					How it works
 				</button>
 			</div>
 			<div class="rise rise-2 min-w-0 max-lg:order-4">
