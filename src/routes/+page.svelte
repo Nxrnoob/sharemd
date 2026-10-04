@@ -64,6 +64,26 @@
 		}
 	}
 
+	let clearing = $state(false);
+	let clearTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clearAll() {
+		if ((markdown.length > 80 || title.length > 30) && !clearing) {
+			clearing = true;
+			if (clearTimer) clearTimeout(clearTimer);
+			clearTimer = setTimeout(() => (clearing = false), 3500);
+			return;
+		}
+		if (clearTimer) clearTimeout(clearTimer);
+		clearing = false;
+		title = '';
+		markdown = '';
+		fileName = null;
+		titleTouched = false;
+		clearDraft();
+		showToast('Cleared editor.');
+	}
+
 	onMount(() => {
 		const items = getShelf();
 		shelfDocs = items;
@@ -550,9 +570,23 @@
 
 					<label class="flex min-h-0 flex-1 flex-col">
 						<span class="mb-1.5 flex items-baseline justify-between text-sm font-medium">
-							Markdown
-							<span class="font-mono text-xs font-normal text-ink-soft tabular-nums dark:text-slate-500">
-								{charCount.toLocaleString()} chars · {kb} KB / 512 KB
+							<span>Markdown</span>
+							<span class="flex items-center gap-2">
+								{#if markdown || title}
+									<button
+										type="button"
+										onclick={clearAll}
+										class="font-mono text-xs transition underline underline-offset-2 {clearing
+											? 'font-semibold text-red-500 hover:text-red-600 dark:text-red-400'
+											: 'text-ink-soft hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400'}"
+									>
+										{clearing ? 'Sure? Clear all' : 'Clear all'}
+									</button>
+									<span class="text-ink-soft/40" aria-hidden="true">·</span>
+								{/if}
+								<span class="font-mono text-xs font-normal text-ink-soft tabular-nums dark:text-slate-500">
+									{charCount.toLocaleString()} chars · {kb} KB / 512 KB
+								</span>
 							</span>
 						</span>
 						<textarea
