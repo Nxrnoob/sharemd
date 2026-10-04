@@ -1,8 +1,8 @@
 # ShareMD
 
-Paste markdown, get an unlisted link that reads well. Thats the whole app.
+Paste markdown, get an unlisted link that reads well. No accounts, zero tracking, nothing in your way.
 
-## Run it
+## Run it locally
 
 ```sh
 bun install
@@ -10,32 +10,48 @@ bun run db:migrate
 bun run dev
 ```
 
-Share flow: paste text or drop a `.md` file on `/` -> get `/s/<id>`. Append `?theme=nxr` (or any theme) and the link carries that theme with it.
-
 ## What it does
 
-- Renders GFM properly (tables, task lists, code blocks with Shiki highlighting), sanitized so shared links cant run scripts
-- 10 themes, monochrome default, switcher in the header
-- Reader has TOC rail + floating TOC, progress bar, read time, back to top, header hides on scroll
-- Rate limited uploads (20/hr per IP), 512KB cap per doc
+- **Clean reading**: Renders GitHub Flavored Markdown, Shiki syntax highlighting for any programming language on demand, server-side LaTeX math via KaTeX (`$E=mc^2$`), GitHub callout alerts (`> [!NOTE]`), tables, Mermaid diagrams, and task lists.
+- **Unlisted by default**: Links are private and unlisted. No signups, no analytics trackers, no indexing.
+- **Link options**:
+  - Custom slugs (`/s/my-project-proposal`)
+  - Password protection (scrypt hashed)
+  - Auto-expiration (1 hour, 1 day, 1 week, 1 month)
+  - Max view limits (burn after reading, with link-crawler bot protection for Slack, Discord, iMessage, and Twitter previews)
+- **Silent Library**: Documents shared from your browser stay recorded in your local **Library** (top bar). You can edit them in place or delete them whenever you want without an account.
+- **Visitor Forking**: Anyone receiving a link can click **Fork** to copy the raw markdown into a fresh draft, or click **Copy MD** to copy the source directly.
+- **Draft Autosave & Clear all**: Unsaved work automatically persists in `localStorage` so refreshing or crashing never loses words. A two-step **Clear all** button wipes the editor safely.
+- **13 Themes**:
+  - Dark: Monochrome (default), Nxr (AMOLED), Dracula, Catppuccin Mocha, Nord, GitHub Dark, Monokai, Tokyo Night, Gruvbox Dark.
+  - Light: GitHub Light, Gruvbox Light, Solarized Light, Catppuccin Latte.
+  - Tri-color swatches with native code block backgrounds per theme.
+- **Keyboard shortcuts**:
+  - `Tab` / `Shift+Tab`: Indent or outdent two spaces
+  - `Cmd+Enter` / `Ctrl+Enter`: Share or save doc
+  - `Esc`: Close popups and guide
+- **Clean printing**: Built-in `@media print` stylesheet strips navigation, TOCs, and UI chrome, printing high-contrast text on white paper.
+- **Accurate downloads**: Downloaded markdown files save with clean filenames derived from the document's title.
 
 ## Stack
 
-SvelteKit 5 + Bun + Drizzle + SQLite (better-sqlite3). Fonts are self-hosted Fontsource, zero external requests.
+- **Framework**: SvelteKit 5 (Runes) + Bun + Vite
+- **Styling**: Tailwind CSS v4 + Tailwind Typography
+- **Database**: SQLite via `better-sqlite3` + Drizzle ORM (configured in WAL mode with indexes on `created_at` and `expires_at`)
+- **Markdown & Math**: `marked` + `isomorphic-dompurify` + `shiki` + `katex` + `mermaid`
+- **Typography**: Self-hosted Sentient serif + system monospace, zero external CDN requests
 
-## Deploy (Dokploy)
+## Deploy (Dokploy / Docker)
 
 ```sh
 docker compose up -d --build
 ```
 
-DB lives at `/data/local.db`, so mount a volume there (`sharemd-data:/data`). Migrations run on boot, nothing manual needed. Single replica is fine, the rate limiter is in-memory.
+SQLite database lives at `/data/local.db`. Mount a persistent volume at `/data` (`sharemd-data:/data`). Database migrations run on container boot automatically.
 
-## Env
+## Environment Variables
 
-| Var | Default | What |
+| Variable | Default | Description |
 |---|---|---|
-| `DATABASE_PATH` | `/data/local.db` (local dev: `./local.db` via `.env`) | SQLite file |
-| `PORT` / `HOST` | `3000` / `0.0.0.0` | Server bind |
-
-Copy `.env.example` to `.env` for local dev.
+| `DATABASE_PATH` | `/data/local.db` (local dev: `./local.db` via `.env`) | SQLite file path |
+| `PORT` / `HOST` | `3000` / `0.0.0.0` | Server bind host and port |
