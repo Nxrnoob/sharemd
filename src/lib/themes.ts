@@ -66,10 +66,10 @@ export const themes: ShareMdTheme[] = [
 			bg: '#282a36',
 			surface: '#343746',
 			text: '#f8f8f2',
-			muted: '#9aa0b8',
+			muted: '#6272a4',
 			border: '#44475a',
-			accent: '#a9a6c4',
-			accentDeep: '#c0bdd8'
+			accent: '#bd93f9',
+			accentDeep: '#ff79c6'
 		}
 	},
 	{
@@ -80,10 +80,10 @@ export const themes: ShareMdTheme[] = [
 			bg: '#1e1e2e',
 			surface: '#313244',
 			text: '#cdd6f4',
-			muted: '#9399b2',
+			muted: '#a6adc8',
 			border: '#45475a',
-			accent: '#8aa0bf',
-			accentDeep: '#a3b8d2'
+			accent: '#cba6f7',
+			accentDeep: '#89b4fa'
 		}
 	},
 	{
@@ -94,10 +94,10 @@ export const themes: ShareMdTheme[] = [
 			bg: '#eff1f5',
 			surface: '#ffffff',
 			text: '#4c4f69',
-			muted: '#8c8fa1',
+			muted: '#7c7f93',
 			border: '#ccd0da',
-			accent: '#46688c',
-			accentDeep: '#35506c'
+			accent: '#8839ef',
+			accentDeep: '#1e66f5'
 		}
 	},
 	{
@@ -108,10 +108,10 @@ export const themes: ShareMdTheme[] = [
 			bg: '#2e3440',
 			surface: '#3b4252',
 			text: '#eceff4',
-			muted: '#9aa3b2',
+			muted: '#d8dee9',
 			border: '#4c566a',
-			accent: '#a0b3c1',
-			accentDeep: '#b0c3cf'
+			accent: '#88c0d0',
+			accentDeep: '#81a1c1'
 		}
 	},
 	{
@@ -122,10 +122,10 @@ export const themes: ShareMdTheme[] = [
 			bg: '#0d1117',
 			surface: '#161b22',
 			text: '#e6edf3',
-			muted: '#9198a1',
+			muted: '#848d97',
 			border: '#30363d',
-			accent: '#6e93bd',
-			accentDeep: '#8facce'
+			accent: '#58a6ff',
+			accentDeep: '#1f6feb'
 		}
 	},
 	{
@@ -134,12 +134,12 @@ export const themes: ShareMdTheme[] = [
 		dark: true,
 		tokens: {
 			bg: '#272822',
-			surface: '#36372f',
+			surface: '#383830',
 			text: '#f8f8f2',
-			muted: '#a6a28f',
+			muted: '#75715e',
 			border: '#49483e',
-			accent: '#a8b47f',
-			accentDeep: '#bcc79a'
+			accent: '#a6e22e',
+			accentDeep: '#f92672'
 		}
 	},
 	{
@@ -150,10 +150,10 @@ export const themes: ShareMdTheme[] = [
 			bg: '#1a1b26',
 			surface: '#24283b',
 			text: '#c0caf5',
-			muted: '#8b91b5',
+			muted: '#9aa5ce',
 			border: '#414868',
-			accent: '#8fa0c4',
-			accentDeep: '#a8b6d6'
+			accent: '#7aa2f7',
+			accentDeep: '#bb9af7'
 		}
 	},
 	{
@@ -166,8 +166,8 @@ export const themes: ShareMdTheme[] = [
 			text: '#ebdbb2',
 			muted: '#a89984',
 			border: '#504945',
-			accent: '#cdb97e',
-			accentDeep: '#dcc998'
+			accent: '#fabd2f',
+			accentDeep: '#fe8019'
 		}
 	}
 ];
