@@ -25,7 +25,10 @@
 					'github-dark',
 					'monokai',
 					'tokyo-night',
-					'gruvbox'
+					'gruvbox',
+					'github-light',
+					'gruvbox-light',
+					'solarized-light'
 				];
 				var q = null;
 				try {
@@ -35,7 +38,7 @@
 				if (t === 'dark' || t === 'deep-black') t = 'monochrome';
 				else if (t === 'light') t = 'catppuccin-latte';
 				if (valid.indexOf(t) < 0) t = 'monochrome';
-				var dark = t !== 'catppuccin-latte';
+				var dark = ['catppuccin-latte', 'github-light', 'gruvbox-light', 'solarized-light'].indexOf(t) < 0;
 				var root = document.documentElement;
 				root.dataset.theme = t;
 				root.classList.toggle('dark', dark);
@@ -52,7 +55,10 @@
 						'github-dark': '#0d1117',
 						monokai: '#272822',
 						'tokyo-night': '#1a1b26',
-						gruvbox: '#282828'
+						gruvbox: '#282828',
+						'github-light': '#ffffff',
+						'gruvbox-light': '#fbf1c7',
+						'solarized-light': '#fdf6e3'
 					}[t];
 					if (bg) meta.setAttribute('content', bg);
 				}

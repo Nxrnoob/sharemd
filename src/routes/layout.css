@@ -98,7 +98,10 @@
 [data-theme='github-dark'] ::selection,
 [data-theme='monokai'] ::selection,
 [data-theme='tokyo-night'] ::selection,
-[data-theme='gruvbox'] ::selection {
+[data-theme='gruvbox'] ::selection,
+[data-theme='github-light'] ::selection,
+[data-theme='gruvbox-light'] ::selection,
+[data-theme='solarized-light'] ::selection {
 	background: color-mix(in srgb, var(--color-iris) 30%, transparent);
 	color: var(--color-ink);
 }
@@ -205,6 +208,46 @@
 	--color-night-surface: #3c3836;
 	--color-night-line: #504945;
 	--code-pre-bg: #1d2021;
+}
+
+[data-theme='github-light'] {
+	--color-paper: #ffffff;
+	--color-surface: #f6f8fa;
+	--color-ink: #1f2328;
+	--color-ink-soft: #656d76;
+	--color-line: #d0d7de;
+	--color-iris: #0969da;
+	--color-iris-deep: #1a7f37;
+	--color-night: #ffffff;
+	--color-night-surface: #f6f8fa;
+	--color-night-line: #d0d7de;
+	--code-pre-bg: #f6f8fa;
+}
+[data-theme='gruvbox-light'] {
+	--color-paper: #fbf1c7;
+	--color-surface: #f2e5bc;
+	--color-ink: #3c3836;
+	--color-ink-soft: #7c6f64;
+	--color-line: #d5c4a1;
+	--color-iris: #b57614;
+	--color-iris-deep: #af3a03;
+	--color-night: #fbf1c7;
+	--color-night-surface: #f2e5bc;
+	--color-night-line: #d5c4a1;
+	--code-pre-bg: #f2e5bc;
+}
+[data-theme='solarized-light'] {
+	--color-paper: #fdf6e3;
+	--color-surface: #eee8d5;
+	--color-ink: #657b83;
+	--color-ink-soft: #9399b1;
+	--color-line: #d5cdb7;
+	--color-iris: #268bd2;
+	--color-iris-deep: #2aa198;
+	--color-night: #fdf6e3;
+	--color-night-surface: #eee8d5;
+	--color-night-line: #d5cdb7;
+	--code-pre-bg: #eee8d5;
 }
 
 html {

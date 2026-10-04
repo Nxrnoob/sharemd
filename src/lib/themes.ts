@@ -169,6 +169,48 @@ export const themes: ShareMdTheme[] = [
 			accent: '#fabd2f',
 			accentDeep: '#fe8019'
 		}
+	},
+	{
+		id: 'github-light',
+		label: 'GitHub Light',
+		dark: false,
+		tokens: {
+			bg: '#ffffff',
+			surface: '#f6f8fa',
+			text: '#1f2328',
+			muted: '#656d76',
+			border: '#d0d7de',
+			accent: '#0969da',
+			accentDeep: '#1a7f37'
+		}
+	},
+	{
+		id: 'gruvbox-light',
+		label: 'Gruvbox Light',
+		dark: false,
+		tokens: {
+			bg: '#fbf1c7',
+			surface: '#f2e5bc',
+			text: '#3c3836',
+			muted: '#7c6f64',
+			border: '#d5c4a1',
+			accent: '#b57614',
+			accentDeep: '#af3a03'
+		}
+	},
+	{
+		id: 'solarized-light',
+		label: 'Solarized Light',
+		dark: false,
+		tokens: {
+			bg: '#fdf6e3',
+			surface: '#eee8d5',
+			text: '#657b83',
+			muted: '#93a1a1',
+			border: '#d5cdb7',
+			accent: '#268bd2',
+			accentDeep: '#2aa198'
+		}
 	}
 ];
 
