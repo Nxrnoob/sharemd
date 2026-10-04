@@ -109,7 +109,7 @@
 		<span
 			aria-hidden="true"
 			class="swatch-split size-4 shrink-0 border"
-			style="background: linear-gradient(90deg, {active.tokens.bg} 50%, {active.tokens.accent} 50%); border-color: {active.tokens.border}"
+			style="background: linear-gradient(90deg, {active.tokens.bg} 42%, {active.tokens.accent} 42% 71%, {active.tokens.accentDeep} 71%); border-color: {active.tokens.border}"
 		></span>
 		<span class="hidden max-w-28 truncate sm:inline">{active.label}</span>
 		<span aria-hidden="true" class="text-[11px] opacity-60">▾</span>
@@ -146,7 +146,7 @@
 					<span
 						aria-hidden="true"
 						class="swatch-split size-5 shrink-0 border"
-						style="background: linear-gradient(90deg, {t.tokens.bg} 50%, {t.tokens.accent} 50%); border-color: {t.tokens.border}"
+						style="background: linear-gradient(90deg, {t.tokens.bg} 42%, {t.tokens.accent} 42% 71%, {t.tokens.accentDeep} 71%); border-color: {t.tokens.border}"
 					></span>
 					<span class="flex-1 truncate">{t.label}</span>
 					{#if t.id === current}

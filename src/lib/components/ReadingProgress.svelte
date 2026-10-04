@@ -55,5 +55,5 @@
 </script>
 
 <div class="fixed inset-x-0 top-0 z-50 h-[3px]" aria-hidden="true">
-	<div class="h-full w-full origin-left bg-iris" style="transform: scaleX({pct / 100})"></div>
+	<div class="h-full w-full origin-left bg-gradient-to-r from-iris to-iris-deep" style="transform: scaleX({pct / 100})"></div>
 </div>
