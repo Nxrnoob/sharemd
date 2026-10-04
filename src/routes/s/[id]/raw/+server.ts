@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { gateDoc, resolveDoc, takeView } from '$lib/server/docs';
+import { gateDoc, resolveDoc } from '$lib/server/docs';
 
 export const GET: RequestHandler = async ({ params, url }) => {
 	const { id } = params;
@@ -13,8 +13,6 @@ export const GET: RequestHandler = async ({ params, url }) => {
 		if (gate.status === 'gone') return new Response('Gone', { status: 410 });
 		return new Response('Password required', { status: 403 });
 	}
-
-	if (!takeView(row.id)) return new Response('Gone', { status: 410 });
 
 	return new Response(row.rawMarkdown, {
 		headers: {

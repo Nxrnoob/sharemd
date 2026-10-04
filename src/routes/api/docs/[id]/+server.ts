@@ -1,10 +1,10 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { deleteDoc, gateDoc, resolveDoc, takeView, updateDoc, verifyDeleteToken } from '$lib/server/docs';
+import { deleteDoc, gateDoc, isCrawlerBot, resolveDoc, takeView, updateDoc, verifyDeleteToken } from '$lib/server/docs';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { cleanInput, renderMarkdown, MAX_MARKDOWN_BYTES } from '$lib/server/markdown';
 
-export const GET: RequestHandler = async ({ params, url }) => {
+export const GET: RequestHandler = async ({ params, url, request }) => {
 	const { id } = params;
 	if (!id) return json({ error: 'Missing id' }, { status: 400 });
 
@@ -18,7 +18,9 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	}
 
 	// Views increment only on successful serve; the guard makes it atomic.
-	if (!takeView(row.id)) return json({ gone: true }, { status: 410 });
+	// Crawler bots generating link cards do not consume views.
+	const isBot = isCrawlerBot(request.headers.get('user-agent'));
+	if (!isBot && !takeView(row.id)) return json({ gone: true }, { status: 410 });
 
 	return json({
 		id: row.id,

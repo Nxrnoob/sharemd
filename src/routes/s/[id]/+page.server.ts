@@ -1,12 +1,12 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
-import { gateDoc, resolveDoc, takeView } from '$lib/server/docs';
+import { gateDoc, isCrawlerBot, resolveDoc, takeView } from '$lib/server/docs';
 
 // Loads pre-rendered HTML (no re-parse here).
 // renderMarkdown() runs only at POST time in src/lib/server/markdown.ts.
 // Gated states (gone / passwordRequired) return NO content (html '') but keep
 // the same shape so the reader UI can render its gate screens.
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, request }) => {
 	const row = resolveDoc(params.id);
 	if (!row) throw error(404, 'Not found');
 
@@ -40,6 +40,22 @@ export const load: PageServerLoad = async ({ params, url }) => {
 			gone: false as const,
 			goneReason: null,
 			passwordRequired: true as const
+		};
+	}
+
+	const isBot = isCrawlerBot(request.headers.get('user-agent'));
+	if (isBot) {
+		const words = row.rawMarkdown.trim().split(/\s+/).filter(Boolean).length;
+		const readMins = Math.max(1, Math.ceil(words / 200));
+		return {
+			...base,
+			html: '',
+			rawMarkdown: '',
+			views: row.views,
+			readTime: `${readMins} min read`,
+			gone: false as const,
+			goneReason: null,
+			passwordRequired: false as const
 		};
 	}
 

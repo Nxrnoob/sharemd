@@ -66,3 +66,12 @@ export function updateDoc(docId: string, title: string, rawMarkdown: string, htm
 		.run();
 	return res.changes > 0;
 }
+
+const BOT_UA_REGEX =
+	/bot|spider|crawl|slurp|facebookexternalhit|whatsapp|telegrambot|slackbot|discordbot|applebot|twitterbot|linkedinbot|embedly|quora link preview|pinterest|skypeuripreview/i;
+
+/** Returns true if user-agent matches known link preview scrapers or search bots. */
+export function isCrawlerBot(userAgent: string | null | undefined): boolean {
+	if (!userAgent) return false;
+	return BOT_UA_REGEX.test(userAgent);
+}
