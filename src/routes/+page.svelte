@@ -390,17 +390,17 @@
 
 <svelte:head>
 	<title>Paste the md your AI gave you and Read it beautifully here · ShareMD</title>
-	<meta name="description" content="Paste the md your AI gave you and Read it beautifully here. No accounts, unlisted links, zero friction." />
+	<meta name="description" content="paste your markdown and get a clean link to share" />
 	<meta property="og:site_name" content="ShareMD" />
 	<meta property="og:type" content="website" />
-	<meta property="og:title" content="Paste the md your AI gave you and Read it beautifully here." />
-	<meta property="og:description" content="No accounts. Unlisted links. Zero friction. Markdown in, clean page out." />
+	<meta property="og:title" content="Paste the md your AI gave you and Read it beautifully here" />
+	<meta property="og:description" content="paste your markdown and get a clean link to share" />
 	<meta property="og:image" content="/og.png" />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="Paste the md your AI gave you and Read it beautifully here." />
-	<meta name="twitter:description" content="No accounts. Unlisted links. Zero friction. Markdown in, clean page out." />
+	<meta name="twitter:title" content="Paste the md your AI gave you and Read it beautifully here" />
+	<meta name="twitter:description" content="paste your markdown and get a clean link to share" />
 	<meta name="twitter:image" content="/og.png" />
 </svelte:head>
 
