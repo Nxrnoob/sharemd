@@ -69,7 +69,7 @@
 					</span>
 					<a
 						href={openHref(entry)}
-						class="shrink-0 border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris"
+						class="shrink-0 rounded-sm border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
 						>Open</a
 					>
 					<DeleteDocButton id={entry.id} title={entry.title} {onDeleted} {onDeleteFailed} />
@@ -80,7 +80,7 @@
 		<p class="mt-6 text-sm text-ink-soft dark:text-slate-400">Nothing here yet. Shared docs appear here.</p>
 		<a
 			href="/"
-			class="mt-4 inline-block border border-line px-4 py-2 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-iris"
+			class="mt-4 inline-block rounded-sm border border-line px-4 py-2 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
 			>Back home</a
 		>
 	{/if}

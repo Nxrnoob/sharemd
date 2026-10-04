@@ -58,19 +58,19 @@
 				<button
 					type="button"
 					onclick={() => (showGuide = true)}
-					class="border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris sm:px-3 sm:text-sm"
+					class="rounded-sm border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98] sm:px-3 sm:text-sm"
 				>
 					<span class="sm:hidden">Guide</span>
 					<span class="hidden sm:inline">How it works</span>
 				</button>
 				<a
 					href="/"
-					class="border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris sm:px-3 sm:text-sm"
+					class="rounded-sm border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98] sm:px-3 sm:text-sm"
 					>New doc</a
 				>
 				<a
 					href="/library"
-					class="border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris sm:px-3 sm:text-sm"
+					class="rounded-sm border border-line px-2.5 py-1.5 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98] sm:px-3 sm:text-sm"
 					>Library</a
 				>
 				<ThemePicker />
