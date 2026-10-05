@@ -286,7 +286,7 @@
 	}
 
 	async function uploadAndInsertImage(file: File) {
-		if (!file.type.startsWith('image/')) return;
+		if (!file.type.startsWith('image/') || uploadingImage) return;
 		uploadingImage = true;
 		showToast('Uploading image...');
 		const formData = new FormData();
@@ -318,6 +318,7 @@
 	}
 
 	function onEditorPaste(e: ClipboardEvent) {
+		if (e.defaultPrevented || uploadingImage) return;
 		const items = e.clipboardData?.items;
 		if (!items) return;
 		for (const item of items) {
@@ -325,6 +326,7 @@
 				const file = item.getAsFile();
 				if (file) {
 					e.preventDefault();
+					e.stopPropagation();
 					uploadAndInsertImage(file);
 					return;
 				}
@@ -589,7 +591,6 @@
 					ondragover={onPanelDragOver}
 					ondragleave={onPanelDragLeave}
 					ondrop={onDrop}
-					onpaste={onEditorPaste}
 					role="region"
 					aria-label="Markdown editor, drop a file anywhere in this panel"
 					class="machine machine-artifact flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface"

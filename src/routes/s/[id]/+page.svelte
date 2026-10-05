@@ -46,6 +46,9 @@
 	let editBusy = $state(false);
 	let editError = $state<string | null>(null);
 	let scrolledPastHeader = $state(false);
+	let editTextAreaEl: HTMLTextAreaElement | null = $state(null);
+	let uploadingEditImage = $state(false);
+	let editUploadedImages = $state<{ url: string; name: string; filename: string }[]>([]);
 	const hasMermaid = $derived(Boolean(data.html && data.html.includes('mermaid-block')));
 
 	type LoadFlags = { passwordRequired?: boolean; gone?: boolean };
@@ -136,6 +139,7 @@
 		}
 		editTitle = data.title || '';
 		editMarkdown = data.rawMarkdown || '';
+		editUploadedImages = extractImagesFromMarkdown(editMarkdown);
 		editError = null;
 		editing = true;
 	}
@@ -211,6 +215,95 @@
 				editMarkdown = ta.value;
 			}
 		}
+	}
+
+	function extractImagesFromMarkdown(md: string) {
+		const regex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+		const list: { url: string; name: string; filename: string }[] = [];
+		let match;
+		while ((match = regex.exec(md)) !== null) {
+			const name = match[1] || 'image';
+			const url = match[2];
+			const filename = url.split('/').pop() || '';
+			if (!list.some((x) => x.url === url)) {
+				list.push({ url, name, filename });
+			}
+		}
+		return list;
+	}
+
+	function insertEditSnippet(snippet: string) {
+		if (!editTextAreaEl) {
+			editMarkdown = (editMarkdown ? editMarkdown + '\n\n' : '') + snippet;
+			return;
+		}
+		const ta = editTextAreaEl;
+		const start = ta.selectionStart ?? ta.value.length;
+		const end = ta.selectionEnd ?? ta.value.length;
+		const val = ta.value;
+		const prefix = start > 0 && val[start - 1] !== '\n' ? '\n\n' : '';
+		const suffix = end < val.length && val[end] !== '\n' ? '\n\n' : '';
+		const next = val.slice(0, start) + prefix + snippet + suffix + val.slice(end);
+		ta.value = next;
+		ta.selectionStart = ta.selectionEnd = start + prefix.length + snippet.length;
+		editMarkdown = next;
+		ta.focus();
+	}
+
+	async function uploadAndInsertEditImage(file: File) {
+		if (!file.type.startsWith('image/') || uploadingEditImage) return;
+		uploadingEditImage = true;
+		flash('Uploading image...');
+		const formData = new FormData();
+		formData.append('file', file);
+		try {
+			const res = await fetch('/api/upload', {
+				method: 'POST',
+				body: formData
+			});
+			const out = (await res.json().catch(() => ({}))) as {
+				url?: string;
+				filename?: string;
+				error?: string;
+			};
+			if (!res.ok || !out.url || !out.filename) {
+				flash(out.error || 'Failed to upload image.');
+				return;
+			}
+			const cleanName = (file.name || 'image').replace(/\.[^/.]+$/, '').trim() || 'image';
+			const mdTag = `![${cleanName}](${out.url})`;
+			insertEditSnippet(mdTag);
+			editUploadedImages = [...editUploadedImages, { url: out.url, name: cleanName, filename: out.filename }];
+			flash('Image inserted.');
+		} catch {
+			flash('Image upload failed. Try again.');
+		} finally {
+			uploadingEditImage = false;
+		}
+	}
+
+	function onEditPaste(e: ClipboardEvent) {
+		if (e.defaultPrevented || uploadingEditImage) return;
+		const items = e.clipboardData?.items;
+		if (!items) return;
+		for (const item of items) {
+			if (item.type.startsWith('image/')) {
+				const file = item.getAsFile();
+				if (file) {
+					e.preventDefault();
+					e.stopPropagation();
+					uploadAndInsertEditImage(file);
+					return;
+				}
+			}
+		}
+	}
+
+	function onEditDrop(e: DragEvent) {
+		const file = e.dataTransfer?.files?.[0];
+		if (!file || !file.type.startsWith('image/')) return;
+		e.preventDefault();
+		uploadAndInsertEditImage(file);
 	}
 
 	async function forkDoc() {
@@ -556,13 +649,69 @@
 						</label>
 						<textarea
 							id="edit-markdown"
+							bind:this={editTextAreaEl}
 							bind:value={editMarkdown}
 							onkeydown={onEditKeyDown}
+							onpaste={onEditPaste}
+							ondrop={onEditDrop}
 							rows="18"
 							spellcheck="false"
 							class="w-full border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night"
 						></textarea>
 					</div>
+					{#if editUploadedImages.length > 0}
+						<div class="mb-4 border border-line bg-paper/40 p-2.5 text-xs dark:border-night-line dark:bg-night/40">
+							<div class="mb-2 flex items-center justify-between">
+								<span class="font-medium text-ink">Images in this doc ({editUploadedImages.length}) · click to relocate or copy</span>
+								<button
+									type="button"
+									onclick={() => (editUploadedImages = [])}
+									class="text-[11px] text-ink-soft transition hover:text-ink"
+								>
+									Dismiss tray
+								</button>
+							</div>
+							<div class="flex flex-wrap gap-2">
+								{#each editUploadedImages as img, idx (img.url)}
+									<div class="flex items-center gap-2 border border-line bg-surface p-1.5 dark:border-night-line dark:bg-night-surface">
+										<img src={img.url} alt={img.name} class="size-8 border border-line object-cover" />
+										<span class="max-w-28 truncate font-mono text-[11px] text-ink-soft">{img.name}</span>
+										<div class="flex items-center gap-1">
+											<button
+												type="button"
+												title="Insert at cursor position"
+												onclick={() => insertEditSnippet(`![${img.name}](${img.url})`)}
+												class="rounded-xs border border-line px-1.5 py-0.5 text-[11px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
+											>
+												Insert
+											</button>
+											<button
+												type="button"
+												title="Copy image link"
+												onclick={async () => {
+													await copyText(new URL(img.url, location.origin).href);
+													flash('Copied image URL.');
+												}}
+												class="rounded-xs border border-line px-1.5 py-0.5 text-[11px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
+											>
+												Copy
+											</button>
+											<button
+												type="button"
+												title="Remove from tray"
+												onclick={() => {
+													editUploadedImages = editUploadedImages.filter((_, i) => i !== idx);
+												}}
+												class="px-1 text-[11px] text-ink-soft transition hover:text-red-500"
+											>
+												×
+											</button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 					{#if editError}
 						<p class="mb-3 text-sm text-red-500">{editError}</p>
 					{/if}
