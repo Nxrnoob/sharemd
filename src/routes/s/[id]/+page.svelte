@@ -10,7 +10,6 @@
 	import TocFloating from '$lib/components/TocFloating.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
 	import ReadingProgress from '$lib/components/ReadingProgress.svelte';
-	import Mermaid from '$lib/components/Mermaid.svelte';
 	import {
 		buildThemedUrl,
 		getThemeFromUrl,
@@ -47,6 +46,7 @@
 	let editBusy = $state(false);
 	let editError = $state<string | null>(null);
 	let scrolledPastHeader = $state(false);
+	const hasMermaid = $derived(Boolean(data.html && data.html.includes('mermaid-block')));
 
 	type LoadFlags = { passwordRequired?: boolean; gone?: boolean };
 	const flags = $derived((data ?? {}) as typeof data & LoadFlags);
@@ -600,7 +600,11 @@
 		</div>
 		<TocRail items={toc} activeId={activeId} />
 	</div>
-		<Mermaid article={articleEl} rev={data.id} />
+		{#if hasMermaid}
+			{#await import('$lib/components/Mermaid.svelte') then { default: Mermaid }}
+				<Mermaid article={articleEl} rev={data.id} />
+			{/await}
+		{/if}
 </main>
 {/if}
 
