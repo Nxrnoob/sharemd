@@ -79,6 +79,7 @@
 		title = '';
 		markdown = '';
 		fileName = null;
+		uploadedImages = [];
 		titleTouched = false;
 		clearDraft();
 		showToast('Cleared editor.');
@@ -257,10 +258,90 @@
 		}
 	}
 
+	interface UploadedImage {
+		url: string;
+		name: string;
+		filename: string;
+	}
+	let uploadedImages = $state<UploadedImage[]>([]);
+	let uploadingImage = $state(false);
+
+	function insertTextAtCursor(snippet: string) {
+		if (!textareaEl) {
+			markdown = (markdown ? markdown + '\n\n' : '') + snippet;
+			onMarkdownInput(markdown);
+			return;
+		}
+		const ta = textareaEl;
+		const start = ta.selectionStart ?? ta.value.length;
+		const end = ta.selectionEnd ?? ta.value.length;
+		const val = ta.value;
+		const prefix = start > 0 && val[start - 1] !== '\n' ? '\n\n' : '';
+		const suffix = end < val.length && val[end] !== '\n' ? '\n\n' : '';
+		const next = val.slice(0, start) + prefix + snippet + suffix + val.slice(end);
+		ta.value = next;
+		ta.selectionStart = ta.selectionEnd = start + prefix.length + snippet.length;
+		onMarkdownInput(next);
+		ta.focus();
+	}
+
+	async function uploadAndInsertImage(file: File) {
+		if (!file.type.startsWith('image/')) return;
+		uploadingImage = true;
+		showToast('Uploading image...');
+		const formData = new FormData();
+		formData.append('file', file);
+		try {
+			const res = await fetch('/api/upload', {
+				method: 'POST',
+				body: formData
+			});
+			const data = (await res.json().catch(() => ({}))) as {
+				url?: string;
+				filename?: string;
+				error?: string;
+			};
+			if (!res.ok || !data.url || !data.filename) {
+				showToast(data.error || 'Failed to upload image.', 'error');
+				return;
+			}
+			const cleanName = (file.name || 'image').replace(/\.[^/.]+$/, '').trim() || 'image';
+			const mdTag = `![${cleanName}](${data.url})`;
+			insertTextAtCursor(mdTag);
+			uploadedImages = [...uploadedImages, { url: data.url, name: cleanName, filename: data.filename }];
+			showToast('Image inserted.');
+		} catch {
+			showToast('Image upload failed. Try again.', 'error');
+		} finally {
+			uploadingImage = false;
+		}
+	}
+
+	function onEditorPaste(e: ClipboardEvent) {
+		const items = e.clipboardData?.items;
+		if (!items) return;
+		for (const item of items) {
+			if (item.type.startsWith('image/')) {
+				const file = item.getAsFile();
+				if (file) {
+					e.preventDefault();
+					uploadAndInsertImage(file);
+					return;
+				}
+			}
+		}
+	}
+
 	function onDrop(e: DragEvent) {
 		e.preventDefault();
 		dragging = false;
-		readFile(e.dataTransfer?.files?.[0]);
+		const file = e.dataTransfer?.files?.[0];
+		if (!file) return;
+		if (file.type.startsWith('image/')) {
+			uploadAndInsertImage(file);
+		} else {
+			readFile(file);
+		}
 	}
 
 	// Panel-wide drag affordance: any hover inside the machine lights the
@@ -508,6 +589,7 @@
 					ondragover={onPanelDragOver}
 					ondragleave={onPanelDragLeave}
 					ondrop={onDrop}
+					onpaste={onEditorPaste}
 					role="region"
 					aria-label="Markdown editor, drop a file anywhere in this panel"
 					class="machine machine-artifact flex h-full min-h-0 flex-col gap-4 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface"
@@ -594,12 +676,67 @@
 							value={markdown}
 							oninput={onEditorInput}
 							onkeydown={onEditorKeyDown}
+							onpaste={onEditorPaste}
 							rows="6"
 							placeholder="# Type or drop a file. Headings, tables, tasks, code."
 							spellcheck="false"
 							class="machine-well min-h-0 w-full flex-1 resize-y border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris lg:resize-none dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 						></textarea>
 					</label>
+
+					{#if uploadedImages.length > 0}
+						<div class="shrink-0 border border-line bg-paper/40 p-2.5 text-xs dark:border-night-line dark:bg-night/40">
+							<div class="mb-2 flex items-center justify-between">
+								<span class="font-medium text-ink">Images ({uploadedImages.length}) · click to relocate or copy</span>
+								<button
+									type="button"
+									onclick={() => (uploadedImages = [])}
+									class="text-[11px] text-ink-soft transition hover:text-ink"
+								>
+									Dismiss tray
+								</button>
+							</div>
+							<div class="flex flex-wrap gap-2">
+								{#each uploadedImages as img, idx (img.url)}
+									<div class="flex items-center gap-2 border border-line bg-surface p-1.5 dark:border-night-line dark:bg-night-surface">
+										<img src={img.url} alt={img.name} class="size-8 border border-line object-cover" />
+										<span class="max-w-24 truncate font-mono text-[11px] text-ink-soft">{img.name}</span>
+										<div class="flex items-center gap-1">
+											<button
+												type="button"
+												title="Insert at cursor position"
+												onclick={() => insertTextAtCursor(`![${img.name}](${img.url})`)}
+												class="rounded-xs border border-line px-1.5 py-0.5 text-[11px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
+											>
+												Insert
+											</button>
+											<button
+												type="button"
+												title="Copy image link"
+												onclick={async () => {
+													await copyText(new URL(img.url, location.origin).href);
+													showToast('Copied image URL.');
+												}}
+												class="rounded-xs border border-line px-1.5 py-0.5 text-[11px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
+											>
+												Copy
+											</button>
+											<button
+												type="button"
+												title="Remove from tray"
+												onclick={() => {
+													uploadedImages = uploadedImages.filter((_, i) => i !== idx);
+												}}
+												class="px-1 text-[11px] text-ink-soft transition hover:text-red-500"
+											>
+												×
+											</button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 
 					<div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
 						<div class="min-w-0 flex-1">
