@@ -492,6 +492,12 @@
 				Copy link
 			</button>
 			<button
+				onclick={() => window.print()}
+				class="border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+			>
+				PDF
+			</button>
+			<button
 				onclick={download}
 				class="btn-accent px-3 py-1.5 text-[13px] font-medium transition"
 			>
