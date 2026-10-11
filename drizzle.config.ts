@@ -1,14 +1,28 @@
 import { defineConfig } from 'drizzle-kit';
 
-// Docker/Dokploy: DATABASE_PATH (default /data/local.db) wins;
-// local dev keeps using DATABASE_URL from .env (`bun run db:migrate`).
-const dbPath = process.env.DATABASE_PATH ?? process.env.DATABASE_URL ?? '/data/local.db';
+// Vercel + Turso: when TURSO_DATABASE_URL is set, drizzle-kit talks to the
+// remote (driver turso) — `bun run db:migrate` then migrates Turso.
+// Otherwise it uses the local file (`bun run db:migrate` migrates local.db,
+// offline, zero config). DATABASE_PATH / DATABASE_URL overrides honored.
+const tursoUrl = process.env.TURSO_DATABASE_URL;
+const tursoToken = process.env.TURSO_AUTH_TOKEN;
+const localPath = process.env.DATABASE_PATH ?? process.env.DATABASE_URL ?? 'local.db';
+const localUrl = localPath.startsWith('file:') ? localPath : `file:${localPath}`;
 
-export default defineConfig({
-	schema: './src/lib/server/db/schema.ts',
-	out: './drizzle',
-	dialect: 'sqlite',
-	dbCredentials: { url: dbPath },
-	verbose: true,
-	strict: true
-});
+export default tursoUrl
+	? defineConfig({
+			schema: './src/lib/server/db/schema.ts',
+			out: './drizzle',
+			dialect: 'turso',
+			dbCredentials: { url: tursoUrl, authToken: tursoToken },
+			verbose: true,
+			strict: true
+		})
+	: defineConfig({
+			schema: './src/lib/server/db/schema.ts',
+			out: './drizzle',
+			dialect: 'sqlite',
+			dbCredentials: { url: localUrl },
+			verbose: true,
+			strict: true
+		});

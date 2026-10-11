@@ -14,7 +14,7 @@ const EXPIRY_ALLOWLIST = [3600, 86400, 604800, 2592000];
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip);
 	if (!allowed) {
 		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
 	}
@@ -53,7 +53,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			return json({ error: 'slug must match ^[a-z0-9-]{3,32}$' }, { status: 400 });
 		}
 		// Slugs must not shadow an existing id either (resolution is slug-first).
-		const clash = db
+		const clash = await db
 			.select({ id: documents.id })
 			.from(documents)
 			.where(or(eq(documents.slug, slug), eq(documents.id, slug)))
@@ -93,7 +93,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const deleteToken = randomBytes(32).toString('hex');
 	const deleteTokenHash = hashPassword(deleteToken);
 
-	db.insert(documents)
+	await db.insert(documents)
 		.values({
 			id,
 			title: cleanTitle,

@@ -1,21 +1,26 @@
 // Production boot migration (no drizzle-kit needed).
-// Applies ./drizzle/*.sql to DATABASE_PATH before the server starts.
-// Local dev is unaffected: keep using `bun run db:migrate` (drizzle-kit).
+// Applies ./drizzle/*.sql to the configured DB before the server starts.
+// Works with a local file (DATABASE_PATH) or Turso (TURSO_DATABASE_URL +
+// TURSO_AUTH_TOKEN). Local dev is unaffected: keep using `bun run db:migrate`.
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { createClient } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
+import { migrate } from 'drizzle-orm/libsql/migrator';
 
+const tursoUrl = process.env.TURSO_DATABASE_URL;
+const tursoToken = process.env.TURSO_AUTH_TOKEN;
 const dbPath = process.env.DATABASE_PATH ?? process.env.DATABASE_URL ?? '/data/local.db';
-mkdirSync(dirname(resolve(dbPath)), { recursive: true });
 
-const sqlite = new Database(dbPath);
-sqlite.pragma('journal_mode = WAL');
+const client = tursoUrl
+	? createClient({ url: tursoUrl, authToken: tursoToken })
+	: createClient({ url: `file:${dbPath.replace(/^file:/, '')}` });
 
-migrate(drizzle(sqlite), {
+if (!tursoUrl) mkdirSync(dirname(resolve(dbPath.replace(/^file:/, ''))), { recursive: true });
+
+await migrate(drizzle(client), {
 	migrationsFolder: resolve(import.meta.dirname ?? '.', '../drizzle')
 });
 
-console.log(`[migrate] applied drizzle migrations to ${dbPath}`);
-sqlite.close();
+console.log(`[migrate] applied drizzle migrations to ${tursoUrl ? tursoUrl : dbPath}`);
+client.close();

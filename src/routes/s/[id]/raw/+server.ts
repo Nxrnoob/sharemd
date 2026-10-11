@@ -16,7 +16,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	const { id } = params;
 	if (!id) return new Response('Missing id', { status: 400 });
 
-	const row = resolveDoc(id);
+	const row = await resolveDoc(id);
 	if (!row) return new Response('Not found', { status: 404 });
 
 	const gate = gateDoc(row, url.searchParams.get('pw'));

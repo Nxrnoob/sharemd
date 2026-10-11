@@ -23,3 +23,13 @@ export const documents = sqliteTable(
 
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
+
+/** Turso-backed rate-limit buckets (serverless-safe). One row per IP:
+ * the rolling 1-hour window is anchored at the first hit in the window. */
+export const rateHits = sqliteTable('rate_hits', {
+	ip: text('ip').primaryKey(),
+	windowStart: integer('window_start').notNull(),
+	count: integer('count').notNull().default(1)
+});
+
+export type RateHit = typeof rateHits.$inferSelect;

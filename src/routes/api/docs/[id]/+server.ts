@@ -8,7 +8,7 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
 	const { id } = params;
 	if (!id) return json({ error: 'Missing id' }, { status: 400 });
 
-	const row = resolveDoc(id);
+	const row = await resolveDoc(id);
 	if (!row) return json({ error: 'Not found' }, { status: 404 });
 
 	const gate = gateDoc(row, url.searchParams.get('pw'));
@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
 	// Views increment only on successful serve; the guard makes it atomic.
 	// Crawler bots generating link cards do not consume views.
 	const isBot = isCrawlerBot(request.headers.get('user-agent'));
-	if (!isBot && !takeView(row.id)) return json({ gone: true }, { status: 410 });
+	if (!isBot && !(await takeView(row.id))) return json({ gone: true }, { status: 410 });
 
 	return json({
 		id: row.id,
@@ -35,7 +35,7 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
 
 export const DELETE: RequestHandler = async ({ params, request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip);
 	if (!allowed) {
 		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
 	}
@@ -52,20 +52,20 @@ export const DELETE: RequestHandler = async ({ params, request, getClientAddress
 	const { token } = body as { token?: unknown };
 
 	// Indistinguishable 404: unknown key and pre-token docs (NULL hash) look identical.
-	const row = resolveDoc(id);
+	const row = await resolveDoc(id);
 	if (!row || !row.deleteTokenHash) return json({ error: 'Not found' }, { status: 404 });
 
 	if (typeof token !== 'string' || !token || !verifyDeleteToken(row, token)) {
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
-	deleteDoc(row.id);
+	await deleteDoc(row.id);
 	return json({ deleted: true });
 };
 
 export const PUT: RequestHandler = async ({ params, request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip);
 	if (!allowed) {
 		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
 	}
@@ -93,7 +93,7 @@ export const PUT: RequestHandler = async ({ params, request, getClientAddress })
 		return json({ error: 'Markdown exceeds 512KB' }, { status: 413 });
 	}
 
-	const row = resolveDoc(id);
+	const row = await resolveDoc(id);
 	if (!row || !row.deleteTokenHash) return json({ error: 'Not found' }, { status: 404 });
 
 	if (typeof token !== 'string' || !token || !verifyDeleteToken(row, token)) {
@@ -104,7 +104,7 @@ export const PUT: RequestHandler = async ({ params, request, getClientAddress })
 	const cleanMd = cleanInput(markdown);
 	const html = await renderMarkdown(cleanMd);
 
-	updateDoc(row.id, cleanTitle, cleanMd, html);
+	await updateDoc(row.id, cleanTitle, cleanMd, html);
 
 	return json({
 		ok: true,

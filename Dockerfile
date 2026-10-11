@@ -1,3 +1,10 @@
+# !!! DOKPLOY FLOW CURRENTLY BROKEN — Vercel migration !!!
+# This Dockerfile expects a standalone node server at /app/build/index.js
+# (adapter-node). The repo now uses @sveltejs/adapter-vercel, whose build emits
+# .vercel/output instead — so `COPY /app/build` copies nothing and the
+# entrypoint fails fast with a clear error (see docker-entrypoint.sh header).
+# To restore Dokploy: switch vite.config.ts back to adapter-node, rebuild.
+# Kept in place (not deleted) so the restore is a revert, not a rewrite.
 # ---------- builder: full install (frozen bun lockfile) + SvelteKit build ----------
 FROM oven/bun:1 AS builder
 WORKDIR /app

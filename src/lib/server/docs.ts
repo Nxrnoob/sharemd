@@ -9,10 +9,10 @@ export type Gate =
 	| { ok: false; status: 'locked' };
 
 /** Resolve by slug first, then by id (slugs can never equal an id: enforced at POST). */
-export function resolveDoc(key: string): Document | undefined {
+export async function resolveDoc(key: string): Promise<Document | undefined> {
 	return (
-		db.select().from(documents).where(eq(documents.slug, key)).get() ??
-		db.select().from(documents).where(eq(documents.id, key)).get()
+		(await db.select().from(documents).where(eq(documents.slug, key)).get()) ??
+		(await db.select().from(documents).where(eq(documents.id, key)).get())
 	);
 }
 
@@ -35,11 +35,11 @@ export function gateDoc(doc: Document, pw: string | null): Gate {
  * Atomic take-a-view. The WHERE guard makes the increment itself the
  * race check: false means another request took the last view — treat as exhausted.
  */
-export function takeView(docId: string): boolean {
-	const res = db.run(
+export async function takeView(docId: string): Promise<boolean> {
+	const res = await db.run(
 		sql`UPDATE documents SET views = views + 1 WHERE id = ${docId} AND (max_views IS NULL OR views < max_views)`
 	);
-	return res.changes > 0;
+	return res.rowsAffected > 0;
 }
 
 /**
@@ -52,19 +52,24 @@ export function verifyDeleteToken(doc: Document, token: string): boolean {
 }
 
 /** Hard-delete a doc row by id. Returns true when a row was removed. */
-export function deleteDoc(docId: string): boolean {
-	const res = db.delete(documents).where(eq(documents.id, docId)).run();
-	return res.changes > 0;
+export async function deleteDoc(docId: string): Promise<boolean> {
+	const res = await db.delete(documents).where(eq(documents.id, docId)).run();
+	return res.rowsAffected > 0;
 }
 
 /** Update a doc's title, markdown, and rendered HTML by id. Returns true when updated. */
-export function updateDoc(docId: string, title: string, rawMarkdown: string, html: string): boolean {
-	const res = db
+export async function updateDoc(
+	docId: string,
+	title: string,
+	rawMarkdown: string,
+	html: string
+): Promise<boolean> {
+	const res = await db
 		.update(documents)
 		.set({ title, rawMarkdown, html })
 		.where(eq(documents.id, docId))
 		.run();
-	return res.changes > 0;
+	return res.rowsAffected > 0;
 }
 
 const BOT_UA_REGEX =

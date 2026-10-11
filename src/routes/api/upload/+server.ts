@@ -13,7 +13,7 @@ const ALLOWED_TYPES: Record<string, true> = {
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip);
 	if (!allowed) {
 		return json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
 	}

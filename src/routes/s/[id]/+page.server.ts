@@ -7,7 +7,7 @@ import { gateDoc, isCrawlerBot, resolveDoc, takeView } from '$lib/server/docs';
 // Gated states (gone / passwordRequired) return NO content (html '') but keep
 // the same shape so the reader UI can render its gate screens.
 export const load: PageServerLoad = async ({ params, url, request }) => {
-	const row = resolveDoc(params.id);
+	const row = await resolveDoc(params.id);
 	if (!row) throw error(404, 'Not found');
 
 	const base = {
@@ -60,7 +60,7 @@ export const load: PageServerLoad = async ({ params, url, request }) => {
 	}
 
 	// Views increment only on successful serve; a lost atomic race reads as exhausted.
-	if (!takeView(row.id)) {
+	if (!(await takeView(row.id))) {
 		return {
 			...base,
 			html: '',
