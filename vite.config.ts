@@ -15,9 +15,12 @@ export default defineConfig({
 			// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
 			// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
 			// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-			// Vercel Hobby + Node serverless (default runtime, pinned so local
-			// builds on newer Node still emit a valid function target).
-			adapter: adapter({ runtime: 'nodejs22.x' }),
+			// This writes .vc-config.json "runtime" per function, which OVERRIDES
+			// both the Vercel dashboard setting and package.json "engines".
+			// Must be Node >= 22.12: isomorphic-dompurify -> jsdom requires
+			// @exodus/bytes, which is ESM-only, and require() of ESM only works
+			// from 22.12+. Older runtimes throw ERR_REQUIRE_ESM on every POST.
+			adapter: adapter({ runtime: 'nodejs24.x' }),
 
 			typescript: {
 				config: (config) => {
