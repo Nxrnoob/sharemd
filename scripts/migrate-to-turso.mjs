@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// One-time copy of every row from the local SQLite file into Turso.
-// Usage: TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... bun scripts/migrate-to-turso.mjs
-//   - Reads local.db (DATABASE_PATH / DATABASE_URL override, else ./local.db).
+// One-time copy of every row from a local SQLite file into Turso.
+// Usage: TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... bun scripts/migrate-to-turso.mjs [source.db]
+//   - Source file: CLI arg wins, else DATABASE_PATH, else ./sharemd-prod-db/sharemd-prod.db,
+//     else ./local.db. (DATABASE_URL is deliberately ignored: bun auto-loads .env,
+//     so it cannot signal an explicit override.)
 //   - Refuses to run without TURSO_DATABASE_URL (clear error, exit 1).
 //   - Refuses when the remote `documents` table is missing (run db:migrate
 //     against Turso first — see .env.example).
@@ -27,17 +29,19 @@ if (!tursoUrl) {
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const candidates = [
-	process.env.DATABASE_PATH ?? process.env.DATABASE_URL,
+	process.argv[2] && resolve(process.argv[2]),
+	process.env.DATABASE_PATH,
 	resolve(scriptDir, '..', 'sharemd-prod-db', 'sharemd-prod.db'),
 	resolve('local.db')
 ].filter(Boolean);
 const localPath = candidates.find((p) => existsSync(p));
 if (!localPath) {
 	console.error(
-		`[migrate-to-turso] local DB not found. Tried:\n${candidates.map((p) => `  - ${p}`).join('\n')}\n  (set DATABASE_PATH to override)`
+		`[migrate-to-turso] source DB not found. Tried:\n${candidates.map((p) => `  - ${p}`).join('\n')}\n  (pass the file as an argument or set DATABASE_PATH)`
 	);
 	process.exit(1);
 }
+console.log(`[migrate-to-turso] reading from ${localPath}`);
 
 const local = createClient({ url: `file:${localPath}` });
 const remote = createClient({ url: tursoUrl, authToken: tursoToken });
