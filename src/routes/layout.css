@@ -16,6 +16,17 @@
 	font-display: swap;
 	src: url('/fonts/Sentient-Bold.woff2') format('woff2');
 }
+/* Wordmark face: Sedgwick Ave Display (Google Fonts), self-hosted like
+   Sentient — the app ships zero external CDN requests. Single weight (400):
+   the wordmark's two-tone colouring supplies the hierarchy that Sentient's
+   500/700 weights used to. */
+@font-face {
+	font-family: 'Sedgwick Ave Display';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/SedgwickAveDisplay-Regular.woff2') format('woff2');
+}
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 @import 'katex/dist/katex.min.css';
@@ -29,6 +40,9 @@
 	   Body: system-ui — the neutral workhorse, zero requests.
 	   Mono: system mono — real data only (code, timestamps, counts). */
 	--font-display: 'Sentient', ui-sans-serif, system-ui, sans-serif;
+	/* Wordmark only — never for headings or body copy; the reading voice
+	   stays Sentient. Falls back to Sentient so a failed load stays on-brand. */
+	--font-graffiti: 'Sedgwick Ave Display', 'Sentient', ui-sans-serif, system-ui, sans-serif;
 	--font-sans: ui-sans-serif, system-ui, sans-serif;
 	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 	--radius-sm: 2px;

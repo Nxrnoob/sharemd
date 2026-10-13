@@ -50,9 +50,9 @@
 	>
 		<div class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4 sm:px-6">
 			<a href="/" class="flex items-center" aria-label="ShareMD home">
-				<span class="font-display text-[17px] font-semibold"><span class="font-medium">share</span><span
-						class="font-bold">MD</span></span
-				>
+<span class="font-graffiti text-[19px] leading-none"><span class="text-ink-soft">share</span><span
+					class="text-iris">MD</span></span
+			>
 			</a>
 			<div class="flex items-center gap-1.5 sm:gap-2">
 				<button
