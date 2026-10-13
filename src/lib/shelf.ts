@@ -18,10 +18,29 @@ export interface ShelfEntry {
 	title: string;
 	token: string;
 	createdAt: number;
+	/**
+	 * Folder this doc is filed under, or null for uncategorised.
+	 * Deliberately optional: shelves written before folders existed have no
+	 * `folder` key and must keep loading unchanged — that is the whole
+	 * migration story. There is no server-side owner to attach a folder to
+	 * (ownership is proven per-document by the token above), so folders are
+	 * local metadata layered over the shelf, not a column on `documents`.
+	 */
+	folder?: string | null;
+}
+
+/** A user-created folder. Single-level by design — see docs in /library. */
+export interface Folder {
+	id: string;
+	name: string;
+	createdAt: number;
 }
 
 const STORAGE_KEY = 'sharemd-shelf';
+const FOLDERS_KEY = 'sharemd-folders';
 const MAX_ENTRIES = 100;
+const MAX_FOLDERS = 50;
+const MAX_FOLDER_NAME = 40;
 
 interface LooseEntry {
 	id?: unknown;
@@ -29,6 +48,7 @@ interface LooseEntry {
 	title?: unknown;
 	token?: unknown;
 	createdAt?: unknown;
+	folder?: unknown;
 }
 
 function normalize(v: unknown): ShelfEntry | null {
@@ -41,7 +61,9 @@ function normalize(v: unknown): ShelfEntry | null {
 		slug: typeof e.slug === 'string' && e.slug !== '' ? e.slug : null,
 		title: typeof e.title === 'string' && e.title !== '' ? e.title : 'Untitled',
 		token: e.token,
-		createdAt: typeof e.createdAt === 'number' && Number.isFinite(e.createdAt) ? e.createdAt : 0
+		createdAt: typeof e.createdAt === 'number' && Number.isFinite(e.createdAt) ? e.createdAt : 0,
+		// Absent (pre-folders shelf) and garbage both land on null = uncategorised.
+		folder: typeof e.folder === 'string' && e.folder !== '' ? e.folder : null
 	};
 }
 
@@ -129,4 +151,141 @@ export async function deleteOwnedDoc(id: string, token: string): Promise<DeleteR
 	} catch {
 		return 'failed';
 	}
+}
+
+/* ---------------------------------------------------------------- folders */
+
+/**
+ * Folders are local metadata over the shelf, stored under their own key so a
+ * corrupt or full folder list can never cost you your delete tokens (and
+ * therefore ownership of your docs). Same defensive contract as the shelf:
+ * every helper no-ops during SSR and swallows quota errors.
+ *
+ * Deliberately single-level. At the shelf's 100-entry ceiling a hierarchy is
+ * tree UI without the payoff, and drag-to-nest is fiddly; `parentId` can be
+ * added later without a storage migration if that ever changes.
+ */
+
+interface LooseFolder {
+	id?: unknown;
+	name?: unknown;
+	createdAt?: unknown;
+}
+
+/** randomUUID where available; a collision-resistant fallback otherwise. */
+function newFolderId(): string {
+	try {
+		if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+			return crypto.randomUUID();
+		}
+	} catch {
+		/* fall through to the manual id */
+	}
+	return `f_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e9).toString(36)}`;
+}
+
+/** Trim + clamp + reject blanks. Returns '' when unusable. */
+function cleanFolderName(name: string): string {
+	if (typeof name !== 'string') return '';
+	return name.trim().replace(/\s+/g, ' ').slice(0, MAX_FOLDER_NAME);
+}
+
+function normalizeFolder(v: unknown): Folder | null {
+	if (typeof v !== 'object' || v === null) return null;
+	const f = v as LooseFolder;
+	if (typeof f.id !== 'string' || f.id === '') return null;
+	if (typeof f.name !== 'string') return null;
+	const name = cleanFolderName(f.name);
+	if (!name) return null;
+	return {
+		id: f.id,
+		name,
+		createdAt: typeof f.createdAt === 'number' && Number.isFinite(f.createdAt) ? f.createdAt : 0
+	};
+}
+
+function loadFolders(): Folder[] {
+	try {
+		if (typeof localStorage === 'undefined') return [];
+		const raw = localStorage.getItem(FOLDERS_KEY);
+		if (!raw) return [];
+		const parsed: unknown = JSON.parse(raw);
+		if (!Array.isArray(parsed)) return [];
+		const out: Folder[] = [];
+		const seen = new Set<string>();
+		for (const v of parsed) {
+			const f = normalizeFolder(v);
+			// First wins on duplicate ids — a duplicate would otherwise split
+			// one folder's docs across two sidebar rows.
+			if (f && !seen.has(f.id)) {
+				seen.add(f.id);
+				out.push(f);
+			}
+		}
+		return out;
+	} catch {
+		return [];
+	}
+}
+
+function saveFolders(folders: Folder[]): void {
+	try {
+		if (typeof localStorage === 'undefined') return;
+		localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+	} catch {
+		/* private mode / quota */
+	}
+}
+
+/** All folders, oldest first. Never throws. */
+export function getFolders(): Folder[] {
+	return loadFolders();
+}
+
+/** Create a folder. Returns null if the name is blank, a case-insensitive
+ *  duplicate, or the 50-folder cap is hit. */
+export function createFolder(name: string): Folder | null {
+	const clean = cleanFolderName(name);
+	if (!clean) return null;
+	const folders = loadFolders();
+	if (folders.some((f) => f.name.toLowerCase() === clean.toLowerCase())) return null;
+	if (folders.length >= MAX_FOLDERS) return null;
+	const folder: Folder = { id: newFolderId(), name: clean, createdAt: Date.now() };
+	saveFolders([...folders, folder]);
+	return folder;
+}
+
+/** Rename in place. Returns false on a blank/duplicate name or unknown id. */
+export function renameFolder(id: string, name: string): boolean {
+	const clean = cleanFolderName(name);
+	if (!clean) return false;
+	const folders = loadFolders();
+	if (!folders.some((f) => f.id === id)) return false;
+	if (folders.some((f) => f.id !== id && f.name.toLowerCase() === clean.toLowerCase())) return false;
+	saveFolders(folders.map((f) => (f.id === id ? { ...f, name: clean } : f)));
+	return true;
+}
+
+/**
+ * Delete a folder. Docs inside it are orphaned, never deleted — they fall back
+ * to uncategorised so losing a folder can never lose work.
+ */
+export function deleteFolder(id: string): void {
+	saveFolders(loadFolders().filter((f) => f.id !== id));
+	const entries = load();
+	const next = entries.map((e) => (e.folder === id ? { ...e, folder: null } : e));
+	if (next.some((e, i) => e !== entries[i])) save(next);
+}
+
+/**
+ * File a doc under a folder, or pass null to unfile it. An unknown folder id is
+ * coerced to null so the shelf can never accumulate dangling references (the
+ * 100-entry shelf cap evicts docs independently of folders).
+ */
+export function setDocFolder(docId: string, folderId: string | null): void {
+	const resolved =
+		folderId && loadFolders().some((f) => f.id === folderId) ? folderId : null;
+	const entries = load();
+	const next = entries.map((e) => (e.id === docId ? { ...e, folder: resolved } : e));
+	if (next.some((e, i) => e !== entries[i])) save(next);
 }
