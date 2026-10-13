@@ -1,15 +1,31 @@
 <script lang="ts">
+	import TocMeta from './TocMeta.svelte';
+
 	export interface TocItem {
 		id: string;
 		text: string;
 		level: number;
 	}
 
-	let { items = [], activeId = null }: { items: TocItem[]; activeId: string | null } = $props();
+	let {
+		items = [],
+		activeId = null,
+		folder = null,
+		linkedPages = []
+	}: {
+		items: TocItem[];
+		activeId: string | null;
+		/** owner-only local metadata; null for viewers (see src/lib/shelf.ts) */
+		folder: { id: string; name: string } | null;
+		linkedPages: { title: string; href: string }[];
+	} = $props();
 </script>
 
 {#if items.length}
-	<aside class="hidden self-start lg:block" aria-label="Table of contents sidebar">
+	<!-- No self-start: the aside must stretch to the grid row's full height or
+	     the sticky nav inside it has no room to travel and the rail scrolls
+	     away with the page (it previously never actually stuck). -->
+	<aside class="hidden lg:block" aria-label="Table of contents sidebar">
 		<nav
 			aria-label="Table of contents"
 			class="sticky top-24 max-h-[calc(100vh-7rem)] overflow-auto py-1"
@@ -31,6 +47,8 @@
 					</li>
 				{/each}
 			</ul>
+
+			<TocMeta {folder} {linkedPages} class="mt-5 border-t border-line pt-4 dark:border-night-line" />
 		</nav>
 	</aside>
 {/if}

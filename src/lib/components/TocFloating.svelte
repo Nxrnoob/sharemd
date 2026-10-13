@@ -1,8 +1,20 @@
 <script lang="ts">
 	import { tick, onDestroy } from 'svelte';
 	import type { TocItem } from './TocRail.svelte';
+	import TocMeta from './TocMeta.svelte';
 
-	let { items = [], activeId = null }: { items: TocItem[]; activeId: string | null } = $props();
+	let {
+		items = [],
+		activeId = null,
+		folder = null,
+		linkedPages = []
+	}: {
+		items: TocItem[];
+		activeId: string | null;
+		/** owner-only local metadata; null for viewers (see src/lib/shelf.ts) */
+		folder: { id: string; name: string } | null;
+		linkedPages: { title: string; href: string }[];
+	} = $props();
 
 	let pastHero = $state(false);
 	let open = $state(false);
@@ -84,6 +96,13 @@
 						</li>
 					{/each}
 				</ul>
+
+				<TocMeta
+					{folder}
+					{linkedPages}
+					onNavigate={() => setOpen(false)}
+					class="mt-3 border-t border-line pt-3 dark:border-night-line"
+				/>
 			</div>
 		{/if}
 		<button

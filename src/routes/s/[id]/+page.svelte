@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
-	import { owns, getOwnedToken, updateShelfTitle } from '$lib/shelf';
+	import { owns, getOwnedToken, updateShelfTitle, getShelf, getFolders } from '$lib/shelf';
 	import { page } from '$app/state';
 	import { codeCopy } from '$lib/actions/codeCopy';
 	import { copyText } from '$lib/clipboard';
@@ -28,6 +28,21 @@
 	let activeId = $state<string | null>(null);
 	// Text of the section currently in view — drives the sticky heading bar.
 	const activeText = $derived(toc.find((t) => t.id === activeId)?.text ?? null);
+	// Other docs this one links to — resolved server-side at read time.
+	const linkedPages = $derived(data.linkedPages ?? []);
+	// Folder filing is local metadata owned by this browser's shelf (see
+	// src/lib/shelf.ts) — viewers and SSR see null. An $effect keyed on the doc
+	// id, not onMount: client navigations reuse this component instance, so
+	// onMount does not re-run and the chip would go stale across docs.
+	let folder = $state<{ id: string; name: string } | null>(null);
+	$effect(() => {
+		const id = data.id;
+		folder = null;
+		const entry = getShelf().find((e) => e.id === id);
+		if (!entry?.folder) return;
+		const f = getFolders().find((x) => x.id === entry.folder);
+		if (f) folder = { id: f.id, name: f.name };
+	});
 	let articleEl = $state<HTMLElement | null>(null);
 	let tocOpen = $state(false);
 	// Theme actually on screen (link override or viewer pick). Buttons always
@@ -759,7 +774,7 @@
 				</div>
 			{/if}
 		</div>
-		<TocRail items={toc} activeId={activeId} />
+		<TocRail items={toc} activeId={activeId} {folder} {linkedPages} />
 	</div>
 		{#if hasMermaid}
 			{#await import('$lib/components/Mermaid.svelte') then { default: Mermaid }}
@@ -770,5 +785,5 @@
 {/if}
 
 <Toast message={toast} />
-<TocFloating items={toc} activeId={activeId} />
+<TocFloating items={toc} activeId={activeId} {folder} {linkedPages} />
 <BackToTop />

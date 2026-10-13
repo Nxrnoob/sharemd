@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import Toast from '$lib/components/Toast.svelte';
 	import DeleteDocButton from '$lib/components/DeleteDocButton.svelte';
 	import {
@@ -41,6 +42,10 @@
 	onMount(() => {
 		entries = getShelf();
 		folders = getFolders();
+		// Deep link from the reader's "Filed in" chip: /library?folder=<id>.
+		// Unknown ids fall through to All; the stale-folder $effect also guards.
+		const wanted = page.url.searchParams.get('folder');
+		if (wanted && folders.some((f) => f.id === wanted)) filter = { kind: 'folder', id: wanted };
 	});
 
 	const counts = $derived.by(() => {
