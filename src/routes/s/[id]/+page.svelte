@@ -546,17 +546,25 @@
 <!-- top bar -->
 <div class="border-b border-line bg-surface/80 backdrop-blur dark:border-night-line dark:bg-night-surface/80">
 	<div class="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 lg:max-w-7xl">
-		<div class="min-w-0 flex-1">
+		<div class="min-w-0 flex-1 basis-full sm:basis-auto">
 			{#if showTopBarTitle}
 				<h1 class="font-display truncate text-[17px] font-semibold tracking-tight transition-opacity duration-200">
 					{data.title}
 				</h1>
 			{/if}
-			<p class="font-mono text-[11px] text-ink-soft dark:text-slate-500 {showTopBarTitle ? 'mt-0.5' : ''}">
-				{dateLabel} · {data.views} {data.views === 1 ? 'view' : 'views'} · {data.readTime}
+			<!-- Mobile: the button row wraps below (basis-full), and this line breaks
+			     between whole segments — never mid-date. Dots are desktop-only. -->
+			<p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] text-ink-soft dark:text-slate-500 {showTopBarTitle ? 'mt-0.5' : ''}">
+				<span class="whitespace-nowrap">{dateLabel}</span>
+				<span class="hidden sm:inline">·</span>
+				<span class="whitespace-nowrap">{data.views} {data.views === 1 ? 'view' : 'views'}</span>
+				<span class="hidden sm:inline">·</span>
+				<span class="whitespace-nowrap">{data.readTime}</span>
 			</p>
 		</div>
-		<div class="flex shrink-0 items-center gap-1.5 print:hidden">
+		<!-- Mobile: shrink-0 off so the group takes the row width and its buttons
+     wrap instead of overflowing the viewport (they cannot all fit at 390px). -->
+		<div class="flex flex-wrap items-center gap-1.5 print:hidden sm:shrink-0">
 			{#if isOwner}
 				<button
 					onclick={startEditing}
