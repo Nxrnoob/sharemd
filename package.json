@@ -23,6 +23,7 @@
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/katex": "^0.16.8",
 		"@types/node": "^24",
+		"@types/sanitize-html": "^2.13.0",
 		"drizzle-kit": "^0.31.10",
 		"svelte": "^5.56.1",
 		"svelte-check": "^4.6.0",
@@ -34,12 +35,12 @@
 		"@fontsource/caveat": "^5.3.0",
 		"@libsql/client": "^0.18.0",
 		"drizzle-orm": "^0.45.2",
-		"isomorphic-dompurify": "^4.4.0",
 		"katex": "^0.19.0",
 		"marked": "18",
 		"marked-gfm-heading-id": "^4.1.4",
 		"mermaid": "^12.0.0",
 		"nanoid": "^6.0.1",
+		"sanitize-html": "~2.13.1",
 		"shiki": "^4.4.3"
 	},
 	"engines": {

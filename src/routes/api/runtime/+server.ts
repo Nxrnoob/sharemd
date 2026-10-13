@@ -2,33 +2,22 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 /**
- * TEMPORARY diagnostic. Reports the deployed runtime so we can settle whether
- * the ERR_REQUIRE_ESM comes from a runtime too old for require(esm) (needs
- * Node >= 22.12) or from something else entirely.
+ * TEMPORARY diagnostic. Reports the deployed runtime.
  *
- * DELETE once the runtime question is resolved.
+ * Originally used to settle whether the ERR_REQUIRE_ESM came from a runtime
+ * too old for require(esm). That question is resolved: isomorphic-dompurify
+ * (and therefore jsdom) has been removed from the server bundle entirely, so
+ * nothing on the request path requires an ES module any more.
+ *
+ * This endpoint is now just runtime telemetry — DELETE when convenient.
  */
 export const GET: RequestHandler = async () => {
-	const out: Record<string, unknown> = {
+	return json({
 		node: process.version,
-		// The exact flag behind this bug. False => require() of an ESM package
-		// throws ERR_REQUIRE_ESM, which is what we are seeing.
+		// require(esm) support. Irrelevant to us now that no ESM is require()d,
+		// but kept because it explains any third-party package that reintroduces it.
 		requireModule: process.features.require_module,
 		arch: process.arch,
 		platform: process.platform
-	};
-
-	// Live proof of the actual failing operation, via createRequire so the
-	// result does not depend on this file's own module system.
-	try {
-		const { createRequire } = await import('node:module');
-		const req = createRequire(import.meta.url);
-		req('isomorphic-dompurify');
-		out.requireDomPurify = 'ok';
-	} catch (e) {
-		out.requireDomPurify = 'FAILED';
-		out.requireDomPurifyError = (e as Error).message.split('\n')[0];
-	}
-
-	return json(out);
+	});
 };

@@ -1,6 +1,6 @@
 import { Marked, type Tokens } from 'marked';
 import { gfmHeadingId } from 'marked-gfm-heading-id';
-import DOMPurify from 'isomorphic-dompurify';
+import sanitizeHtml from 'sanitize-html';
 import { getSingletonHighlighter, type Highlighter } from 'shiki';
 import katex from 'katex';
 
@@ -79,7 +79,7 @@ marked.use({
 			const lang = (codeToken.lang || '').toLowerCase();
 			if (lang === 'mermaid') {
 				// Designer-lane contract: emit raw text for client-side mermaid rendering.
-				// Skip Shiki; DOMPurify (below) keeps class on pre/code.
+				// Skip Shiki; the sanitizer below keeps class on pre/code.
 				const escaped = codeToken.text
 					.replace(/&/g, '&amp;')
 					.replace(/</g, '&lt;')
@@ -148,21 +148,77 @@ marked.use({
 	}
 });
 
-DOMPurify.addHook('afterSanitizeElements', (node) => {
-	if (node.nodeName === 'INPUT' && 'type' in node && node.type !== 'checkbox') {
-		node.parentNode?.removeChild(node);
-	}
-});
+/**
+ * Sanitizer config — a faithful port of the previous DOMPurify allowlist.
+ *
+ * isomorphic-dompurify was removed because it pulls jsdom, which requires the
+ * ESM-only @exodus/bytes. The Vercel Node runtime refuses to require() an ES
+ * module, so every POST /api/docs died with ERR_REQUIRE_ESM (the Share button).
+ * There is no all-CommonJS jsdom tree left to pin to — stepping the chain back
+ * only moves the ESM boundary (@csstools/css-calc, then css-parser-algorithms)
+ * — and bundling jsdom breaks the ESM server build on __dirname. sanitize-html
+ * needs no DOM at all, so it loads cleanly on any runtime.
+ *
+ * sanitize-html is deliberately pinned to ~2.13.x: 2.14+ depends on the
+ * ESM-only htmlparser2@12, which reintroduces this exact failure.
+ */
+type SanitizeOptions = NonNullable<Parameters<typeof sanitizeHtml>[1]>;
 
-DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-	if (node.nodeName === 'A') {
-		const href = node.getAttribute('href') || '';
-		if (href.startsWith('http://') || href.startsWith('https://')) {
-			node.setAttribute('target', '_blank');
-			node.setAttribute('rel', 'noopener noreferrer');
+const SANITIZE_OPTIONS: SanitizeOptions = {
+	// DOMPurify's default HTML allowlist, plus this app's ADD_TAGS
+	// (span/input/math/semantics/mrow/mi/mo/mn/annotation/svg/path/line for
+	// KaTeX MathML and mermaid SVG).
+	allowedTags: [
+		'a', 'abbr', 'b', 'blockquote', 'br', 'caption', 'cite', 'code', 'col',
+		'colgroup', 'dd', 'del', 'details', 'div', 'dl', 'dt', 'em', 'figcaption',
+		'figure', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'ins', 'kbd',
+		'li', 'mark', 'ol', 'p', 'pre', 'q', 'rp', 'rt', 'ruby', 's', 'samp',
+		'section', 'small', 'span', 'strong', 'sub', 'summary', 'sup', 'table',
+		'tbody', 'td', 'tfoot', 'th', 'thead', 'time', 'tr', 'u', 'ul', 'var', 'wbr',
+		'span', 'input', 'math', 'semantics', 'mrow', 'mi', 'mo', 'mn',
+		'annotation', 'svg', 'path', 'line'
+	],
+	allowedAttributes: {
+		'*': [
+			// this app's ADD_ATTR
+			'target', 'class', 'style', 'type', 'disabled', 'checked', 'rel',
+			'aria-hidden', 'viewBox', 'd', 'xmlns', 'display', 'encoding',
+			// DOMPurify defaults the above tags rely on
+			'href', 'src', 'alt', 'title', 'id', 'name', 'width', 'height',
+			'colspan', 'rowspan', 'lang', 'dir', 'aria-label', 'aria-roledescription',
+			'role', 'start', 'value'
+		],
+		// mermaid SVG presentation attributes
+		svg: [
+			'viewBox', 'xmlns', 'style', 'width', 'height', 'class', 'role',
+			'aria-roledescription', 'aria-hidden', 'id', 'fill', 'stroke',
+			'stroke-width', 'stroke-dasharray', 'stroke-linecap', 'opacity',
+			'transform', 'marker-end', 'marker-start', 'font-family', 'font-size'
+		],
+		path: ['d', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'class', 'id'],
+		line: ['x1', 'y1', 'x2', 'y2', 'stroke', 'stroke-width', 'class'],
+		math: ['xmlns', 'display', 'class', 'style'],
+		annotation: ['encoding'],
+		input: ['type', 'disabled', 'checked', 'name', 'value'],
+		a: ['href', 'target', 'rel', 'class', 'title'],
+		img: ['src', 'alt', 'title', 'width', 'height', 'class', 'loading']
+	},
+	// SVG viewBox and MathML tags are case-sensitive; keep them intact.
+	parser: { lowerCaseTags: false, lowerCaseAttributeNames: false },
+	allowedSchemes: ['http', 'https', 'mailto'],
+	// was the afterSanitizeElements hook: drop every input except checkboxes
+	exclusiveFilter: (frame) => frame.tag === 'input' && frame.attribs.type !== 'checkbox',
+	// was the afterSanitizeAttributes hook: external links open safely
+	transformTags: {
+		a: (tagName, attribs) => {
+			const href = attribs.href || '';
+			if (href.startsWith('http://') || href.startsWith('https://')) {
+				return { tagName, attribs: { ...attribs, target: '_blank', rel: 'noopener noreferrer' } };
+			}
+			return { tagName, attribs };
 		}
 	}
-});
+};
 
 /**
  * Server-only: pre-render markdown to sanitized HTML at POST time.
@@ -170,35 +226,5 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
  */
 export async function renderMarkdown(raw: string): Promise<string> {
 	const dirty = (await marked.parse(raw, { async: true })) as string;
-	return DOMPurify.sanitize(dirty, {
-		ADD_ATTR: [
-			'target',
-			'class',
-			'style',
-			'type',
-			'disabled',
-			'checked',
-			'rel',
-			'aria-hidden',
-			'viewBox',
-			'd',
-			'xmlns',
-			'display',
-			'encoding'
-		],
-		ADD_TAGS: [
-			'span',
-			'input',
-			'math',
-			'semantics',
-			'mrow',
-			'mi',
-			'mo',
-			'mn',
-			'annotation',
-			'svg',
-			'path',
-			'line'
-		]
-	});
+	return sanitizeHtml(dirty, SANITIZE_OPTIONS);
 }
