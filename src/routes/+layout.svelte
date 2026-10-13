@@ -17,7 +17,7 @@
 	// back on any scroll up. Landing header never hides.
 	onMount(() => {
 		let lastY = window.scrollY;
-		const onScroll = () => {
+			const onScroll = () => {
 			const y = window.scrollY;
 			const onReaderRoute = page.url.pathname.startsWith('/s/');
 			const tocOpen = document.documentElement.dataset.tocOpen === 'true';
@@ -25,6 +25,10 @@
 			else if (y > lastY + 4) headerHidden = true;
 			else if (y < lastY - 4) headerHidden = false;
 			lastY = y;
+			// Expose for fixed reader layers (the sticky section heading) that must
+			// yield to this header when it slides back in. Same channel as tocOpen.
+			if (headerHidden) document.documentElement.dataset.headerHidden = 'true';
+			else delete document.documentElement.dataset.headerHidden;
 		};
 		window.addEventListener('scroll', onScroll, { passive: true });
 		return () => window.removeEventListener('scroll', onScroll);
@@ -34,6 +38,7 @@
 	$effect(() => {
 		void page.url.pathname;
 		headerHidden = false;
+		delete document.documentElement.dataset.headerHidden;
 	});
 </script>
 
@@ -45,7 +50,7 @@
 <div class="relative z-10 flex min-h-dvh flex-col">
 	<header
 		class="site-header z-30 border-b border-line transition-transform duration-300 dark:border-night-line {isReader
-			? 'sticky top-0'
+			? 'sticky top-0 bg-surface/90 backdrop-blur dark:bg-night-surface/90'
 			: 'lg:sticky lg:top-0'} {headerHidden && isReader ? '-translate-y-full' : ''}"
 	>
 		<div class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4 sm:px-6">

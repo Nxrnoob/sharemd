@@ -10,6 +10,7 @@
 	import TocFloating from '$lib/components/TocFloating.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
 	import ReadingProgress from '$lib/components/ReadingProgress.svelte';
+	import StickyHeading from '$lib/components/StickyHeading.svelte';
 	import {
 		buildThemedUrl,
 		getThemeFromUrl,
@@ -25,6 +26,8 @@
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 	let toc = $state<{ id: string; text: string; level: number }[]>([]);
 	let activeId = $state<string | null>(null);
+	// Text of the section currently in view — drives the sticky heading bar.
+	const activeText = $derived(toc.find((t) => t.id === activeId)?.text ?? null);
 	let articleEl = $state<HTMLElement | null>(null);
 	let tocOpen = $state(false);
 	// Theme actually on screen (link override or viewer pick). Buttons always
@@ -542,6 +545,7 @@
 	</main>
 {:else}
 <ReadingProgress target={articleEl} />
+<StickyHeading text={activeText} />
 
 <!-- top bar -->
 <div class="border-b border-line bg-surface/80 backdrop-blur dark:border-night-line dark:bg-night-surface/80">
