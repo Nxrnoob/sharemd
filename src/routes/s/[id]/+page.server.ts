@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { gateDoc, isCrawlerBot, resolveDoc, takeView } from '$lib/server/docs';
+import { resolveDocLinks } from '$lib/server/doclinks';
 
 // Loads pre-rendered HTML (no re-parse here).
 // renderMarkdown() runs only at POST time in src/lib/server/markdown.ts.
@@ -26,6 +27,7 @@ export const load: PageServerLoad = async ({ params, url, request }) => {
 				rawMarkdown: '',
 				views: row.views,
 				readTime: '',
+				linkedPages: [],
 				gone: true as const,
 				goneReason: gate.reason,
 				passwordRequired: false as const
@@ -37,6 +39,7 @@ export const load: PageServerLoad = async ({ params, url, request }) => {
 			rawMarkdown: '',
 			views: row.views,
 			readTime: '',
+			linkedPages: [],
 			gone: false as const,
 			goneReason: null,
 			passwordRequired: true as const
@@ -53,6 +56,7 @@ export const load: PageServerLoad = async ({ params, url, request }) => {
 			rawMarkdown: '',
 			views: row.views,
 			readTime: `${readMins} min read`,
+			linkedPages: [],
 			gone: false as const,
 			goneReason: null,
 			passwordRequired: false as const
@@ -67,6 +71,7 @@ export const load: PageServerLoad = async ({ params, url, request }) => {
 			rawMarkdown: '',
 			views: row.views + 1,
 			readTime: '',
+			linkedPages: [],
 			gone: true as const,
 			goneReason: 'exhausted' as const,
 			passwordRequired: false as const
@@ -77,12 +82,17 @@ export const load: PageServerLoad = async ({ params, url, request }) => {
 	const words = row.rawMarkdown.trim().split(/\s+/).filter(Boolean).length;
 	const readMins = Math.max(1, Math.ceil(words / 200));
 
+	// Doc-to-doc references resolve at read time so links stay live as the
+	// library evolves; the resolved targets also feed the "Linked pages" list.
+	const { html, linked } = await resolveDocLinks(row.html, row.id);
+
 	return {
 		...base,
-		html: row.html,
+		html,
 		rawMarkdown: row.rawMarkdown,
 		views: row.views + 1,
 		readTime: `${readMins} min read`,
+		linkedPages: linked,
 		gone: false as const,
 		goneReason: null,
 		passwordRequired: false as const
