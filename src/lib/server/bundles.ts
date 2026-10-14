@@ -106,19 +106,38 @@ export async function getBundleMembers(bundleId: string): Promise<BundleMember[]
  * Delete a bundle and its membership rows. Members themselves survive — a
  * bundle is a snapshot of links, not ownership of the docs behind them. Every
  * member keeps working at its own /s/<id>.
+ *
+ * The bundle row goes first because that is the operation that was actually
+ * requested. Membership cleanup is best-effort: if it fails, the leftover rows
+ * are keyed by a bundle id that no longer exists, and every read of membership
+ * is filtered by bundle id, so they are inert rather than corrupting.
  */
 export async function deleteBundle(bundleId: string): Promise<boolean> {
-	await db.delete(bundleItems).where(eq(bundleItems.bundleId, bundleId)).run();
 	const res = await db.delete(bundles).where(eq(bundles.id, bundleId)).run();
+	try {
+		await db.delete(bundleItems).where(eq(bundleItems.bundleId, bundleId)).run();
+	} catch {
+		/* orphaned membership rows are inert — see above */
+	}
 	return res.rowsAffected > 0;
 }
 
 /**
- * Drop a deleted doc's membership rows. Called from the doc delete path so a
- * bundle can never keep pointing at a row that no longer exists.
+ * Drop a deleted doc's membership rows. Called from the doc delete path.
+ *
+ * Best-effort by design, and this matters: membership is bookkeeping layered
+ * on top of document deletion, so a failure here must never take down the
+ * delete the user actually asked for. `getBundleMembers` already skips ids
+ * that no longer resolve to a document, so stale rows are inert. This is what
+ * keeps the endpoint working on a database where the migration has not been
+ * applied yet, instead of 500-ing on a housekeeping query.
  */
 export async function dropDocMemberships(docId: string): Promise<void> {
-	await db.delete(bundleItems).where(eq(bundleItems.docId, docId)).run();
+	try {
+		await db.delete(bundleItems).where(eq(bundleItems.docId, docId)).run();
+	} catch {
+		/* see above */
+	}
 }
 
 /**
