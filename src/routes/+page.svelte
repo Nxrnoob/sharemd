@@ -6,7 +6,7 @@
 	import DeleteDocButton from '$lib/components/DeleteDocButton.svelte';
 	import LetterField from '$lib/components/LetterField.svelte';
 	import { copyText } from '$lib/clipboard';
-	import { addToShelf, getShelf, type ShelfEntry } from '$lib/shelf';
+	import { addToShelf, getShelf, getFolders, createFolder, type ShelfEntry, type Folder } from '$lib/shelf';
 	import type { DeleteResult } from '$lib/shelf';
 	import { buildThemedUrl, isThemeId, DEFAULT_THEME_ID } from '$lib/themes';
 	import type { ThemeId } from '$lib/themes';
@@ -89,6 +89,7 @@
 		const items = getShelf();
 		shelfDocs = items;
 		shelfIds = new Set(items.map((e) => e.id));
+		folders = getFolders();
 		try {
 			const saved = localStorage.getItem(DRAFT_KEY);
 			if (saved) {
@@ -111,6 +112,52 @@
 	let slug = $state('');
 	let optPassword = $state('');
 	let expiry = $state('0');
+	// Folder filing at share time. Folders are local metadata owned by this
+	// browser (src/lib/shelf.ts); the pick rides along on the shelf entry, so
+	// one localStorage write files the doc — no second pass, no server change.
+	let folders = $state<Folder[]>([]);
+	let shareFolderId = $state('');
+	let creatingFolder = $state(false);
+	let newFolderName = $state('');
+	let folderError = $state('');
+
+	function onFolderSelect(e: Event) {
+		const el = e.currentTarget as HTMLSelectElement;
+		if (el.value === '__new__') {
+			// Sentinel picked: swap to the create input; the select snaps back so
+			// the choice stays "whatever it was" until the folder exists.
+			creatingFolder = true;
+			newFolderName = '';
+			folderError = '';
+			el.value = shareFolderId;
+		} else {
+			shareFolderId = el.value;
+		}
+	}
+
+	function commitNewFolder() {
+		if (!creatingFolder) return;
+		const name = newFolderName.trim();
+		if (!name) {
+			creatingFolder = false; // blank = cancel
+			folderError = '';
+			return;
+		}
+		const f = createFolder(name);
+		if (!f) {
+			folderError = 'That name is blank, taken, or over 40 characters.';
+			return;
+		}
+		folders = getFolders();
+		shareFolderId = f.id;
+		creatingFolder = false;
+		folderError = '';
+	}
+
+	function cancelNewFolder() {
+		creatingFolder = false;
+		folderError = '';
+	}
 	// NOTE: type="number" binds null when the field is empty, so every use
 	// below goes through str() first. Never call .trim() on raw state.
 	let maxViews: string | number | null = $state('');
@@ -419,7 +466,10 @@
 						slug: typeof out.slug === 'string' && out.slug ? out.slug : null,
 						title: finalTitle.slice(0, 200),
 						token: deleteToken,
-						createdAt: Date.now()
+						createdAt: Date.now(),
+						// File at share time. Validated against the live folder list so a
+						// folder deleted in another tab can't leave a dangling reference.
+						folder: folders.some((f) => f.id === shareFolderId) ? shareFolderId : null
 					});
 					// Reassign (not mutate) so the own-row icon appears reactively.
 					shelfDocs = getShelf();
@@ -833,15 +883,53 @@
 											placeholder="Unlimited"
 											class="w-full border border-line bg-paper px-2.5 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 										/>
-									</label>
-								</div>
-								<button
-									type="button"
-									onclick={closeOptions}
-									class="btn-accent mt-4 w-full px-4 py-2 text-sm font-semibold transition"
-								>
-									Done
-								</button>
+							</label>
+							</div>
+							<label class="mt-3 block">
+								<span class="mb-1.5 block text-sm font-medium">Folder</span>
+								{#if creatingFolder}
+									<!-- svelte-ignore a11y_autofocus -->
+									<input
+										bind:value={newFolderName}
+										onkeydown={(e) => {
+											if (e.key === 'Enter') {
+												e.preventDefault();
+												commitNewFolder();
+											} else if (e.key === 'Escape') {
+												cancelNewFolder();
+											}
+										}}
+										onblur={commitNewFolder}
+										maxlength="40"
+										placeholder="New folder name"
+										autofocus
+										class="w-full border border-line bg-paper px-3 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+									/>
+									{#if folderError}
+										<span class="mt-1 block text-xs text-red-500">{folderError}</span>
+									{/if}
+								{:else}
+									<select
+										value={shareFolderId}
+										onchange={onFolderSelect}
+										class="w-full border border-line bg-paper px-2.5 py-2 text-sm focus:border-iris dark:border-night-line dark:bg-night"
+									>
+										<option value="">No folder</option>
+										{#each folders as f (f.id)}
+											<option value={f.id}>{f.name}</option>
+										{/each}
+										<option value="__new__">+ New folder…</option>
+									</select>
+								{/if}
+								<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">Local to this browser. Change anytime in Library.</span>
+							</label>
+							<button
+								type="button"
+								onclick={closeOptions}
+								class="btn-accent mt-4 w-full px-4 py-2 text-sm font-semibold transition"
+							>
+								Done
+							</button>
 							</div>
 						{/if}
 						<button
