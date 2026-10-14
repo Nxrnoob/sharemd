@@ -641,6 +641,50 @@
 					How it works
 				</button>
 			</div>
+			<!--
+		Recently viewed — the visitor's own trail. Sits directly above the
+		owner's Recent shelf block so the two "recent" ideas read as one group,
+		and high enough on the page to be found: at the very bottom it was
+		easy to walk straight past. Still hidden when empty, so a first-time
+		visitor's landing page is unchanged.
+	-->
+	{#if recentTrail.length}
+		<section class="mb-8" aria-labelledby="recent-heading">
+			<div class="flex items-baseline justify-between gap-4">
+				<h2
+					id="recent-heading"
+					class="font-display text-lg font-semibold tracking-tight"
+				>
+					Recently viewed
+				</h2>
+				<button
+					type="button"
+					onclick={clearRecentList}
+					class="shrink-0 text-xs text-ink-soft transition hover:text-iris dark:text-slate-500"
+				>
+					Clear
+				</button>
+			</div>
+			<ul class="mt-3 grid gap-2 sm:grid-cols-2">
+				{#each recentTrail as e (e.kind + e.id)}
+					<li>
+						<a
+							href={recentHref(e)}
+							class="flex items-baseline justify-between gap-3 border border-line bg-surface px-3.5 py-2.5 transition hover:border-iris dark:border-night-line dark:bg-night-surface"
+						>
+							<span class="min-w-0 truncate text-sm font-medium">{e.title}</span>
+							<span
+								class="shrink-0 text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500"
+							>
+								{e.kind === 'bundle' ? 'Folder' : 'Doc'}
+							</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
+
 			<div class="rise rise-2 min-w-0 max-lg:order-4">
 				<h2 class="text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500">Recent</h2>
 				{#if visibleRecent.length}
@@ -994,43 +1038,6 @@
 		</section>
 	</div>
 
-	<!--
-		Recently viewed. Only rendered once there is something to show, so a
-		first-time visitor sees an unchanged landing page.
-	-->
-	{#if recentTrail.length}
-		<section class="mt-10 border-t border-line pt-8 dark:border-night-line" aria-labelledby="recent-heading">
-			<div class="flex items-baseline justify-between gap-4">
-				<h2 id="recent-heading" class="font-display text-lg font-semibold tracking-tight">
-					Recently viewed
-				</h2>
-				<button
-					type="button"
-					onclick={clearRecentList}
-					class="shrink-0 text-xs text-ink-soft transition hover:text-iris dark:text-slate-500"
-				>
-					Clear
-				</button>
-			</div>
-			<ul class="mt-4 grid gap-2 sm:grid-cols-2">
-				{#each recentTrail as e (e.kind + e.id)}
-					<li>
-						<a
-							href={recentHref(e)}
-							class="flex items-baseline justify-between gap-3 border border-line bg-surface px-3.5 py-2.5 transition hover:border-iris dark:border-night-line dark:bg-night-surface"
-						>
-							<span class="min-w-0 truncate text-sm font-medium">{e.title}</span>
-							<span
-								class="shrink-0 text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500"
-							>
-								{e.kind === 'bundle' ? 'Folder' : 'Doc'}
-							</span>
-						</a>
-					</li>
-				{/each}
-			</ul>
-		</section>
-	{/if}
-</main>
+	</main>
 
 <Toast message={toast?.message ?? null} kind={toast?.kind ?? 'ok'} link={toast?.link ?? null} />
