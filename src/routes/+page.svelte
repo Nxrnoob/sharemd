@@ -6,6 +6,7 @@
 	import DeleteDocButton from '$lib/components/DeleteDocButton.svelte';
 	import LetterField from '$lib/components/LetterField.svelte';
 	import { copyText } from '$lib/clipboard';
+	import { getRecent, clearRecent, recentHref, type RecentEntry } from '$lib/recent';
 	import { addToShelf, getShelf, getFolders, createFolder, type ShelfEntry, type Folder } from '$lib/shelf';
 	import type { DeleteResult } from '$lib/shelf';
 	import { buildThemedUrl, isThemeId, DEFAULT_THEME_ID } from '$lib/themes';
@@ -33,6 +34,47 @@
 	let shelfIds = $state<Set<string>>(new Set());
 	let hiddenIds = $state<Set<string>>(new Set());
 	let shelfDocs = $state<ShelfEntry[]>([]);
+
+	/**
+	 * Recently viewed — the visitor's own trail, deliberately separate from the
+	 * shelf above. The shelf is the owner's record (and holds delete tokens);
+	 * this is what a *recipient* saw, so someone who gets bounced to the
+	 * homepage mid-thread can walk straight back to the folder.
+	 */
+	let recent = $state<RecentEntry[]>([]);
+
+	function refreshRecent(): void {
+		recent = getRecent();
+	}
+
+	function clearRecentList(): void {
+		clearRecent();
+		refreshRecent();
+	}
+
+	/**
+	 * Docs the owner's RECENT shelf section already lists are dropped here, so
+	 * the two lists stay complementary instead of restating each other: that
+	 * one is what you own, this one is what you merely opened.
+	 */
+	const recentTrail = $derived(
+		recent.filter((e) => !(e.kind === 'doc' && shelfIds.has(e.id)))
+	);
+
+	onMount(() => {
+		refreshRecent();
+		// Event-driven, not polled: another tab recording a view, or this tab
+		// coming back to the foreground, should surface it without a reload.
+		const onStorage = (e: StorageEvent) => {
+			if (e.key === 'sharemd-recent') refreshRecent();
+		};
+		window.addEventListener('storage', onStorage);
+		window.addEventListener('focus', refreshRecent);
+		return () => {
+			window.removeEventListener('storage', onStorage);
+			window.removeEventListener('focus', refreshRecent);
+		};
+	});
 
 	// Whole-panel drop target: files can land anywhere on the machine.
 	let panelEl: HTMLElement | null = $state(null);
@@ -951,6 +993,44 @@
 			</div>
 		</section>
 	</div>
+
+	<!--
+		Recently viewed. Only rendered once there is something to show, so a
+		first-time visitor sees an unchanged landing page.
+	-->
+	{#if recentTrail.length}
+		<section class="mt-10 border-t border-line pt-8 dark:border-night-line" aria-labelledby="recent-heading">
+			<div class="flex items-baseline justify-between gap-4">
+				<h2 id="recent-heading" class="font-display text-lg font-semibold tracking-tight">
+					Recently viewed
+				</h2>
+				<button
+					type="button"
+					onclick={clearRecentList}
+					class="shrink-0 text-xs text-ink-soft transition hover:text-iris dark:text-slate-500"
+				>
+					Clear
+				</button>
+			</div>
+			<ul class="mt-4 grid gap-2 sm:grid-cols-2">
+				{#each recentTrail as e (e.kind + e.id)}
+					<li>
+						<a
+							href={recentHref(e)}
+							class="flex items-baseline justify-between gap-3 border border-line bg-surface px-3.5 py-2.5 transition hover:border-iris dark:border-night-line dark:bg-night-surface"
+						>
+							<span class="min-w-0 truncate text-sm font-medium">{e.title}</span>
+							<span
+								class="shrink-0 text-[11px] tracking-wide text-ink-soft uppercase dark:text-slate-500"
+							>
+								{e.kind === 'bundle' ? 'Folder' : 'Doc'}
+							</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
 </main>
 
 <Toast message={toast?.message ?? null} kind={toast?.kind ?? 'ok'} link={toast?.link ?? null} />

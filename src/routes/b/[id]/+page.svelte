@@ -4,11 +4,19 @@
 	import HowItWorksModal from '$lib/components/HowItWorksModal.svelte';
 	import BackLink from '$lib/components/BackLink.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
+	import { noteViewed } from '$lib/recent';
 
 	let { data } = $props();
 
 	/** This bundle's own path, used to mark where a reader arrived from. */
 	const bundleHref = $derived(`/b/${data.slug ?? data.id}`);
+
+	// Same contract as the reader: only record what the visitor actually got to
+	// see, so a locked or expired folder never pollutes their trail.
+	$effect(() => {
+		if (isGone || isGated) return;
+		noteViewed('bundle', data.id, data.slug, data.title);
+	});
 
 	const isGone = $derived(data.gone === true);
 	const isGated = $derived(!isGone && data.passwordRequired === true);

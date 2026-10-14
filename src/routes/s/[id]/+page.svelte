@@ -10,6 +10,7 @@
 	import TocFloating from '$lib/components/TocFloating.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
 	import BackLink from '$lib/components/BackLink.svelte';
+	import { noteViewed } from '$lib/recent';
 	import ReadingProgress from '$lib/components/ReadingProgress.svelte';
 	import StickyHeading from '$lib/components/StickyHeading.svelte';
 	import {
@@ -89,6 +90,19 @@
 	});
 	const backHref = $derived(bundleFrom ?? '/library');
 	const backLabel = $derived(bundleFrom ? 'Back to folder' : 'Library');
+
+	/**
+	 * Record this doc in the visitor's own "recently viewed" trail, so landing
+	 * on the homepage mid-thread does not strand them. An effect keyed on the
+	 * id rather than onMount, because SvelteKit reuses this component across
+	 * client-side navigations between docs — onMount would only fire for the
+	 * first one. Gated and gone docs are skipped: the trail should only hold
+	 * things the visitor actually got to read.
+	 */
+	$effect(() => {
+		if (isGone || isGated) return;
+		noteViewed('doc', data.id, data.slug, data.title ?? 'Untitled');
+	});
 	const gateError = $derived(
 		pwError ?? (unlockTried && isGated ? 'Wrong password. Try again.' : null)
 	);
@@ -517,6 +531,18 @@
 			<p class="mt-3 text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
 				Ask the sender for a fresh one, or share a doc of your own.
 			</p>
+			{#if bundleFrom}
+				<!-- Only shown when this doc was opened out of a folder. Wording
+				     stays honest: a deleted doc drops out of the folder index, so
+				     this promises the rest of the folder, not this page. -->
+				<div class="mt-5 border-t border-line pt-5 dark:border-night-line">
+					<p class="text-[15px] leading-relaxed text-ink-soft dark:text-slate-400">
+						This doc was shared as part of a folder. The rest of that folder may still be
+						readable.
+					</p>
+					<BackLink href={bundleFrom} label="Open that folder" />
+				</div>
+			{/if}
 			<a
 				href="/"
 				class="btn-accent mt-6 inline-flex items-center justify-center px-6 py-2.5 text-[15px] font-semibold transition"
