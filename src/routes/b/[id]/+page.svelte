@@ -2,9 +2,13 @@
 	import { copyText } from '$lib/clipboard';
 	import ThemePicker from '$lib/components/ThemePicker.svelte';
 	import HowItWorksModal from '$lib/components/HowItWorksModal.svelte';
+	import BackLink from '$lib/components/BackLink.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
 
 	let { data } = $props();
+
+	/** This bundle's own path, used to mark where a reader arrived from. */
+	const bundleHref = $derived(`/b/${data.slug ?? data.id}`);
 
 	const isGone = $derived(data.gone === true);
 	const isGated = $derived(!isGone && data.passwordRequired === true);
@@ -119,6 +123,7 @@
 	</main>
 {:else}
 	<main class="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
+		<div class="mb-6"><BackLink href="/library" label="Library" /></div>
 		<p class="text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">
 			Folder · {data.members.length}
 			{data.members.length === 1 ? 'doc' : 'docs'}
@@ -142,7 +147,7 @@
 					</div>
 				{:else}
 					<a
-						href={m.href}
+						href="{m.href}?from={encodeURIComponent(bundleHref)}"
 						class="group flex items-baseline justify-between gap-4 border border-line bg-surface px-4 py-3.5 transition hover:border-iris dark:border-night-line dark:bg-night-surface"
 					>
 						<span class="text-[15px] font-medium group-hover:underline">{m.title}</span>

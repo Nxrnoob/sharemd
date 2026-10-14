@@ -9,6 +9,7 @@
 	import TocRail from '$lib/components/TocRail.svelte';
 	import TocFloating from '$lib/components/TocFloating.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
+	import BackLink from '$lib/components/BackLink.svelte';
 	import ReadingProgress from '$lib/components/ReadingProgress.svelte';
 	import StickyHeading from '$lib/components/StickyHeading.svelte';
 	import {
@@ -73,6 +74,21 @@
 	const flags = $derived((data ?? {}) as typeof data & LoadFlags);
 	const isGone = $derived(flags.gone === true);
 	const isGated = $derived(!isGone && flags.passwordRequired === true);
+
+	/**
+	 * Where "back" goes. `?from=` is set by the bundle index, but it arrives in
+	 * the URL, so it is attacker-controlled and must never be trusted verbatim:
+	 * a permissive version of this is an open redirect (phishing links that
+	 * bounce off your own domain look legitimate). Accept only an exact bundle
+	 * path — that rejects `//evil.com`, absolute URLs, and anything carrying a
+	 * query or fragment. Everything else falls back to the library.
+	 */
+	const bundleFrom = $derived.by(() => {
+		const from = page.url.searchParams.get('from');
+		return from && /^\/b\/[A-Za-z0-9_-]{1,64}$/.test(from) ? from : null;
+	});
+	const backHref = $derived(bundleFrom ?? '/library');
+	const backLabel = $derived(bundleFrom ? 'Back to folder' : 'Library');
 	const gateError = $derived(
 		pwError ?? (unlockTried && isGated ? 'Wrong password. Try again.' : null)
 	);
@@ -657,6 +673,7 @@
 <main class="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10 lg:max-w-7xl">
 	<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-12">
 		<div class="min-w-0">
+			<div class="mb-5"><BackLink href={backHref} label={backLabel} /></div>
 			{#if editing}
 				<div class="border border-line bg-surface p-4 sm:p-6 dark:border-night-line dark:bg-night-surface">
 					<div class="mb-4">
