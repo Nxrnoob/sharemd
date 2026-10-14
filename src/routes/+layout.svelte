@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import './layout.css';
-	import { DEFAULT_THEME_ID } from '$lib/themes';
 	import ThemePicker from '$lib/components/ThemePicker.svelte';
 	import HowItWorksModal from '$lib/components/HowItWorksModal.svelte';
 
@@ -43,8 +42,8 @@
 </script>
 
 <svelte:head>
-	<!-- Default-theme favicon; paintTheme() swaps the href on every theme change. -->
-	<link rel="icon" type="image/png" href={`/favicons/${DEFAULT_THEME_ID}.png`} />
+	<!-- Static brand favicon: the wordmark in the Nxr colorway, transparent. -->
+	<link rel="icon" type="image/png" href="/favicon.png" />
 </svelte:head>
 
 <!-- Letter Field layering: this stacking context paints above the fixed
