@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { deleteDoc, gateDoc, isCrawlerBot, resolveDoc, takeView, updateDoc, verifyDeleteToken } from '$lib/server/docs';
+import { dropDocMemberships } from '$lib/server/bundles';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { cleanInput, renderMarkdown, MAX_MARKDOWN_BYTES } from '$lib/server/markdown';
 
@@ -59,6 +60,9 @@ export const DELETE: RequestHandler = async ({ params, request, getClientAddress
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
+	// Drop bundle membership before the row goes, so no bundle can keep a
+	// dangling pointer to a document that no longer exists.
+	await dropDocMemberships(row.id);
 	await deleteDoc(row.id);
 	return json({ deleted: true });
 };

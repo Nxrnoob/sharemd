@@ -14,6 +14,8 @@
 		type Folder
 	} from '$lib/shelf';
 	import type { DeleteResult } from '$lib/shelf';
+	import { createBundleForFolder } from '$lib/bundles';
+	import { copyText } from '$lib/clipboard';
 
 	// Library: docs shared from this browser (the silent-token shelf).
 	// Client-only list, no server load, no per-row fetch. Viewers never
@@ -36,6 +38,8 @@
 	let renameDraft = $state('');
 
 	let dragId = $state<string | null>(null);
+	/** folder id currently being shared as one link, or null = idle */
+	let sharingFolderId = $state<string | null>(null);
 	/** folder id, '__none__' for the uncategorised drop target, null = idle */
 	let dropTarget = $state<string | null>(null);
 
@@ -143,6 +147,32 @@
 		deleteFolder(f.id);
 		refresh();
 		showToast(`"${f.name}" deleted — its docs moved to Uncategorised.`);
+	}
+
+	/**
+	 * Share a whole folder as one link. The bundle is an immutable snapshot:
+	 * every filed doc must be provable with a token this browser holds, and the
+	 * server refuses any member that already carries its own password, expiry,
+	 * or view cap — one gate governs the whole share.
+	 */
+	async function shareFolder(f: Folder) {
+		if (sharingFolderId) return;
+		sharingFolderId = f.id;
+		try {
+			const res = await createBundleForFolder(f.id, f.name);
+			if (!res.ok) {
+				showToast(res.error, 'error');
+				return;
+			}
+			const url = new URL(res.url, location.origin).href;
+			if (await copyText(url)) {
+				showToast(`Shared ${f.name}. Folder link copied.`, 'ok');
+			} else {
+				showToast(`Shared ${f.name}. Copy the link: ${res.url}`, 'ok');
+			}
+		} finally {
+			sharingFolderId = null;
+		}
 	}
 
 	function moveTo(docId: string, folderId: string | null) {
@@ -272,6 +302,13 @@
 									class="rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris dark:text-slate-500"
 									onclick={() => startRename(f)}
 									aria-label="Rename {f.name}">Rename</button
+								>
+								<button
+									type="button"
+									class="rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris disabled:opacity-40 dark:text-slate-500"
+									onclick={() => shareFolder(f)}
+									disabled={sharingFolderId === f.id}
+									aria-label="Share {f.name} as one link">Share</button
 								>
 								<button
 									type="button"
