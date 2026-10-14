@@ -217,7 +217,7 @@
 	{#if entries.length || folders.length}
 		<div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
 			<!-- folder rail -->
-			<nav class="w-full shrink-0 lg:sticky lg:top-6 lg:w-52" aria-label="Library folders">
+			<nav class="w-full shrink-0 lg:sticky lg:top-6 lg:w-64" aria-label="Library folders">
 				<button
 					type="button"
 					class="{navBtn} {filter.kind === 'all'
@@ -257,7 +257,7 @@
 
 				{#each folders as f (f.id)}
 					<div
-						class="flex items-center gap-1 {filter.kind === 'folder' && filter.id === f.id
+						class="group flex items-center gap-1 {filter.kind === 'folder' && filter.id === f.id
 							? 'bg-surface dark:bg-night-surface'
 							: ''} {dropTarget === f.id ? 'ring-1 ring-iris' : ''} rounded-sm"
 						ondragover={(e) => {
@@ -296,7 +296,7 @@
 								<span class="min-w-0 flex-1 truncate">{f.name}</span>
 								<span class="tabular-nums opacity-60">{counts.byFolder.get(f.id) ?? 0}</span>
 							</button>
-							<span class="hidden shrink-0 gap-0.5 group-hover:flex lg:flex">
+							<span class="hidden shrink-0 gap-0.5 group-hover:flex focus-within:flex lg:flex">
 								<button
 									type="button"
 									class="rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris dark:text-slate-500"
