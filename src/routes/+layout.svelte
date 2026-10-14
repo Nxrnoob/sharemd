@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import { DEFAULT_THEME_ID } from '$lib/themes';
 	import ThemePicker from '$lib/components/ThemePicker.svelte';
 	import HowItWorksModal from '$lib/components/HowItWorksModal.svelte';
 
@@ -42,7 +42,10 @@
 	});
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<svelte:head>
+	<!-- Default-theme favicon; paintTheme() swaps the href on every theme change. -->
+	<link rel="icon" type="image/png" href={`/favicons/${DEFAULT_THEME_ID}.png`} />
+</svelte:head>
 
 <!-- Letter Field layering: this stacking context paints above the fixed
      body-level ghost-letter canvas (z-0), which itself composites above the

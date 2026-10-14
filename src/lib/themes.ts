@@ -289,4 +289,10 @@ function paintTheme(theme: ShareMdTheme): void {
 	root.style.colorScheme = theme.dark ? 'dark' : 'light';
 	const meta = document.querySelector('meta[name="theme-color"]');
 	if (meta) meta.setAttribute('content', theme.tokens.bg);
+	// Favicon follows the theme: one transparent wordmark PNG per theme lives
+	// in static/favicons/. Favicons are static files — CSS can't reach them —
+	// so the swap is an href change, keyed to the same paint that updates the
+	// theme-color meta above.
+	const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+	if (icon) icon.href = `/favicons/${theme.id}.png`;
 }
