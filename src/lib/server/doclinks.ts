@@ -1,7 +1,5 @@
-import { sql } from 'drizzle-orm';
-import { db } from './db';
-import { documents, type Document } from './db/schema';
 import { gateDoc, resolveDoc } from './docs';
+import type { Document } from './db/schema';
 
 export interface LinkedPage {
 	title: string;
@@ -20,15 +18,6 @@ function decodeEntities(s: string): string {
 		.replace(/&#39;/g, "'");
 }
 
-/** Case-insensitive exact title match — the last-resort reference form. */
-async function resolveByTitle(title: string): Promise<Document | undefined> {
-	return db
-		.select()
-		.from(documents)
-		.where(sql`lower(${documents.title}) = ${title.toLowerCase()}`)
-		.get();
-}
-
 /**
  * Resolve doc-to-doc references at READ time, not share time. That choice is
  * the whole point: a doc created AFTER the one linking to it still resolves,
@@ -38,11 +27,16 @@ async function resolveByTitle(title: string): Promise<Document | undefined> {
  *   /s/<slug-or-id>                     already internal — kept, listed below
  *   <slug>                              bare slug or doc id
  *   ./<slug> · <slug>.md · ./<slug>.md  editor-style relative file links
- *   <Doc Title>                         case-insensitive exact title match
  *
  * External http(s), mailto/tel and #anchors are left untouched, and an
  * unresolvable target is left exactly as authored — a link to something that
  * is not a doc must keep behaving like whatever it is.
+ *
+ * Every form above names its target EXPLICITLY. There is deliberately no
+ * fall-through to matching a bare link target against doc titles: titles are
+ * neither unique nor private, so a global title match let any author probe
+ * for — and silently link a reader to — a stranger's document by guessing its
+ * name. Resolving an explicit slug or id already covers that case.
  *
  * Input is the DOMPurify-sanitized HTML stored at share time; this pass only
  * rewrites `href` values to `/s/<slug-or-id>` built from server-owned data,
@@ -100,7 +94,7 @@ export async function resolveDocLinks(
 			if (!candidate || /[/\\]/.test(candidate)) continue;
 			const key = candidate.toLowerCase();
 			if (!resolved.has(key)) {
-				resolved.set(key, (await resolveDoc(candidate)) ?? (await resolveByTitle(candidate)) ?? null);
+				resolved.set(key, (await resolveDoc(candidate)) ?? null);
 			}
 			doc = resolved.get(key) ?? undefined;
 		}
