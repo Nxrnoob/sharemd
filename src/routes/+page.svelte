@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import Toast from '$lib/components/Toast.svelte';
+	import DragGhost from '$lib/components/DragGhost.svelte';
 	import CoverArt from '$lib/components/CoverArt.svelte';
 	import DeleteDocButton from '$lib/components/DeleteDocButton.svelte';
 	import LetterField from '$lib/components/LetterField.svelte';
@@ -1039,5 +1040,9 @@
 	</div>
 
 	</main>
+
+<!-- Follows the pointer while a file is in flight. `dragging` is the panel's
+     own hover state, so the ghost knows when it is over the real drop zone. -->
+<DragGhost overTarget={dragging} />
 
 <Toast message={toast?.message ?? null} kind={toast?.kind ?? 'ok'} link={toast?.link ?? null} />
