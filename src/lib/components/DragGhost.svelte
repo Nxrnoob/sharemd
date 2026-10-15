@@ -1,5 +1,6 @@
 <script lang="ts">
-	import CatMeow from './CatMeow.svelte';
+	import { onMount } from 'svelte';
+	import PopCat from './PopCat.svelte';
 
 	/**
 	 * A cursor-following ghost shown while a file is being dragged over the
@@ -22,6 +23,25 @@
 	let visible = $state(false);
 	let x = $state(0);
 	let y = $state(0);
+	let vw = $state(0);
+
+	/**
+	 * The cat mirrors across the vertical centreline: on the left half it
+	 * faces right, on the right half it faces left, so it always looks
+	 * inwards instead of out of the viewport — which is what gives the
+	 * asymmetric cheek patch on the art somewhere sensible to sit.
+	 *
+	 * Applied via the `scale` property, not `transform`, because the bob
+	 * animation already owns `transform` on this element.
+	 */
+	const flipped = $derived(vw > 0 && x < vw / 2);
+
+	onMount(() => {
+		vw = window.innerWidth;
+		const onResize = () => (vw = window.innerWidth);
+		window.addEventListener('resize', onResize);
+		return () => window.removeEventListener('resize', onResize);
+	});
 
 	function carriesFiles(e: DragEvent): boolean {
 		const types = e.dataTransfer?.types;
@@ -59,22 +79,23 @@
 		class="pointer-events-none fixed top-0 left-0 z-[100] will-change-transform"
 		style:transform="translate3d({x}px, {y}px, 0)"
 		aria-hidden="true"
+		inert
 	>
 		<div
-			class="drag-ghost-lift ml-4 mt-4 transition-transform duration-150 ease-out {overTarget
+			class="drag-ghost-lift ml-8 mt-8 transition-transform duration-150 ease-out {overTarget
 				? 'scale-110'
 				: 'scale-100'}"
 		>
-			<div
-				class="drag-ghost-cat"
-			>
+			<div class="drag-ghost-bob" style:scale={flipped ? '-1 1' : '1 1'}>
 				<!--
-					Recreated as vector geometry rather than traced from the
-					reference photo: the cat's fur and the wall behind it sit in
-					the same brightness band, so no cutout is possible from those
-					pixels. Drawn, it is clean at any size and inherits the theme.
+					Art is the author's own outline cat. The bob lives out here
+					rather than inside it, because that artwork animates its mouth
+					only — the movement is ours to add, which also keeps the
+					component reusable as a plain button elsewhere.
+					strokeWidth is scaled up from the art's 130px/10 default to hold
+					the same visual weight at 96px, or the outline goes spindly.
 				-->
-				<CatMeow size={72} />
+				<PopCat size={96} strokeWidth={14} autoPlay interval={250} sound={false} />
 			</div>
 		</div>
 	</div>
@@ -82,8 +103,36 @@
 
 <style>
 	/*
-	 * No animation lives here any more. The cursor position is applied to the
-	 * outer element via `transform`, and the bob + meow belong to the cat
-	 * itself so they stay in sync — see CatMeow.svelte.
+	 * The bob lives here, not in the cat: PopCat animates its mouth on its own
+	 * clock, so a second transform on that component would fight it. Keeping
+	 * this on a wrapper keeps the two from colliding.
+	 *
+	 * Period is 0.5s to match PopCat's 250ms half-cycle, and the peak sits at
+	 * 25% so the hop happens while the mouth is open. Peaking at 50% instead
+	 * would land the highest point exactly as the mouth snaps shut.
 	 */
+	@keyframes ghost-bob {
+		0%,
+		50%,
+		100% {
+			transform: translateY(0) rotate(-2.5deg);
+		}
+		25% {
+			transform: translateY(-7px) rotate(2.5deg);
+		}
+	}
+
+	.drag-ghost-bob {
+		animation: ghost-bob 0.5s ease-in-out infinite;
+		/* The mirror rides on `scale`, which the bob's `transform` never
+		   touches, so the two animate independently without fighting. */
+		transition: scale 0.18s ease-out;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		/* Keep the cat legible and present, just still. */
+		.drag-ghost-bob {
+			animation: none;
+		}
+	}
 </style>
