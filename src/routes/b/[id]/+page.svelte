@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { copyText } from '$lib/clipboard';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -51,6 +51,10 @@
 	let addBusy = $state(false);
 	let addError = $state<string | null>(null);
 	let addOk = $state<string | null>(null);
+	// The add tile lives in the file grid, so opening the form can leave it
+	// above the fold on a long folder. Both ends keep focus on the tile.
+	let addTileEl = $state<HTMLButtonElement | null>(null);
+	let addTitleEl = $state<HTMLInputElement | null>(null);
 
 	// Docs added from this page, shown immediately instead of via a reload:
 	// the server counts one view per load, and a contributor should not spend
@@ -119,6 +123,43 @@
 	const members = $derived([...data.members, ...added]);
 	const live = $derived(members.filter((m) => !m.gone));
 	const dead = $derived(members.filter((m) => m.gone));
+	/** Docs somebody else put here — the "who do I ask about this" signal. */
+	const contributedCount = $derived(members.filter((m) => m.contributorName !== null).length);
+
+	/**
+	 * The tally, in the place a file manager keeps it: on the status bar under
+	 * the contents, never in the header. The header belongs to the folder's own
+	 * name alone, or the folder starts competing with what is inside it.
+	 * Zero-valued clauses drop out rather than printing "0 contributors".
+	 */
+	const statusLine = $derived.by(() => {
+		const n = members.length;
+		const parts = [`${n} ${n === 1 ? 'item' : 'items'}`];
+		const c = contributedCount;
+		if (c > 0) parts.push(`${c} from ${c === 1 ? 'contributor' : 'contributors'}`);
+		if (dead.length > 0) parts.push(`${dead.length} unavailable`);
+		return parts.join('  ·  ');
+	});
+
+	/** Full sentence behind a tile, for its tooltip and its hover title. */
+	function memberSummary(m: Member): string {
+		const read = `${m.readMins} min read`;
+		return m.contributorName ? `${read} · added by ${m.contributorName}` : read;
+	}
+
+	async function openAddForm() {
+		addOpen = true;
+		// The tile is the last item in the grid, so on a long folder the form
+		// opens below the fold. Focusing the first field scrolls it into view.
+		await tick();
+		addTitleEl?.focus();
+	}
+
+	async function closeAddForm() {
+		addOpen = false;
+		await tick();
+		addTileEl?.focus();
+	}
 
 	function timeAgo(ts: number): string {
 		const s = Math.floor((Date.now() - ts) / 1000);
@@ -409,160 +450,309 @@ const out = (await res.json().catch(() => ({}))) as {
 		</div>
 	</main>
 {:else}
-	<main class="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
-		<div class="mb-6"><BackLink href="/library" label="Library" /></div>
-		<p class="text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">
-			Folder · {members.length}
-			{members.length === 1 ? 'doc' : 'docs'}
-		</p>
-		<h1 class="font-display mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{data.title}</h1>
-		<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">
-			Shared {timeAgo(data.createdAt)} · {data.views}
-			{data.views === 1 ? 'view' : 'views'}
-		</p>
+	<!-- The one document glyph for the whole folder. Every member is markdown,
+	     so varied icons would be fiction; a single page-with-a-folded-corner,
+	     hairline-stroked and inheriting colour, carries the type instead. -->
+	{#snippet docGlyph(cls: string)}
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="1.5"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			aria-hidden="true"
+			class={cls}
+		>
+			<path d="M14 2.5H7A1.5 1.5 0 0 0 5.5 4v16A1.5 1.5 0 0 0 7 21.5h10a1.5 1.5 0 0 0 1.5-1.5V7z"
+			></path>
+			<path d="M14 2.5V7h4.5"></path>
+			<path d="M8.75 12.5h6.5M8.75 16h4.5"></path>
+		</svg>
+	{/snippet}
 
-		<div class="mt-8 flex flex-col gap-3">
-			{#each members as m (m.id)}
-				{#if m.gone}
-					<div
-						class="flex items-baseline justify-between gap-4 border border-line px-4 py-3.5 opacity-55 dark:border-night-line"
-					>
-						<span class="text-[15px] line-through">{m.title}</span>
-						<span class="shrink-0 text-xs tracking-wide text-ink-soft uppercase dark:text-slate-500">
-							{m.gone === 'expired' ? 'expired' : 'view limit'}
-						</span>
-					</div>
-				{:else}
-					<a
-						href={memberHref(m)}
-						class="group flex items-baseline justify-between gap-4 border border-line bg-surface px-4 py-3.5 transition hover:border-iris dark:border-night-line dark:bg-night-surface"
-					>
-						<span class="min-w-0">
-							<span class="block text-[15px] font-medium group-hover:underline">{m.title}</span>
-							<!-- Only docs somebody contributed are attributed; the creator's own
-							     docs belong to the share, not to a person. -->
-							{#if m.contributorName}
-								<span class="mt-0.5 block text-xs text-ink-soft dark:text-slate-500">
-									added by {m.contributorName}
+	<main class="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
+		<div class="mb-6"><BackLink href="/library" label="Library" /></div>
+
+		<!-- Folder header. Deliberately unboxed and set apart by a single rule:
+		     the contents below are boxes, and a boxed header would sit at the
+		     same weight as its own members. -->
+		<header class="flex items-start gap-4 border-b border-line pb-6 dark:border-night-line">
+			<svg
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+				class="mt-1.5 size-8 shrink-0 text-ink-soft dark:text-slate-500"
+			>
+				<path
+					d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
+				></path>
+			</svg>
+			<div class="min-w-0 flex-1">
+				<p class="text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Folder</p>
+				<h1 class="font-display mt-2 text-3xl font-bold tracking-tight break-words sm:text-4xl">
+					{data.title}
+				</h1>
+				<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">
+					Shared {timeAgo(data.createdAt)} · {data.views}
+					{data.views === 1 ? 'view' : 'views'}
+				</p>
+			</div>
+		</header>
+
+		{#if members.length === 0}
+			<div
+				class="mt-6 border border-dashed border-line px-5 py-12 text-center dark:border-night-line"
+			>
+				<p class="text-[15px] font-medium">This folder is empty.</p>
+				<p class="mt-1.5 text-sm text-ink-soft dark:text-slate-400">
+					{data.canContribute
+						? 'Be the first to put a doc in it.'
+						: 'Nobody has put a doc in it yet.'}
+				</p>
+			</div>
+		{:else}
+			<!-- The file grid. auto-fill reflows instead of overflowing: two tiles
+			     across on a phone, three from 640px, five on a wide desktop.
+			     min() on the floor means it can never demand more than the row. -->
+			<ul
+				class="mt-6 grid grid-cols-[repeat(auto-fill,minmax(min(148px,100%),1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-4"
+			>
+				{#each members as m, i (m.id)}
+					<li class="rise min-w-0" style="animation-delay: {60 + Math.min(i * 26, 420)}ms">
+						{#if m.gone}
+							<!-- Unavailable members stay visible and stay in the creator's
+							     order, but are a div, never an anchor: there is no link
+							     to a page that would only bounce the reader. Dashed
+							     outline and a struck title say "not here" at a glance. -->
+							<div
+								class="flex h-full flex-col items-center border border-dashed border-line px-3 py-4 text-center opacity-70 sm:px-4 sm:py-5 dark:border-night-line"
+							>
+								{@render docGlyph(
+									'size-7 shrink-0 text-ink-soft [stroke-dasharray:3_2.5] sm:size-8'
+								)}
+								<span
+									class="mt-2.5 line-clamp-2 min-h-9 w-full text-[13.5px] leading-snug font-medium text-ink-soft line-through decoration-1 dark:text-slate-500"
+									title={m.title}
+								>
+									{m.title}
 								</span>
-							{/if}
-						</span>
-						<span class="shrink-0 text-sm tabular-nums text-ink-soft dark:text-slate-400">
-							{m.readMins} min
-						</span>
-					</a>
+								<span
+									class="mt-auto block w-full truncate pt-1.5 text-center font-mono text-[10px] tracking-[0.12em] text-ink-soft uppercase dark:text-slate-500"
+								>
+									{m.gone === 'expired' ? 'expired' : 'view limit'}
+								</span>
+							</div>
+						{:else}
+							<a
+								href={memberHref(m)}
+								title={memberSummary(m)}
+								class="group flex h-full flex-col items-center border border-line bg-surface px-3 py-4 text-center transition hover:border-iris dark:border-night-line dark:bg-night-surface sm:px-4 sm:py-5"
+							>
+								{@render docGlyph(
+									'size-7 shrink-0 text-ink-soft transition-colors group-hover:text-iris dark:text-slate-500 sm:size-8'
+								)}
+								<!-- min-h-9 holds two lines so one-line titles do not
+								     unbalance their row against longer neighbours. -->
+								<span
+									class="mt-2.5 line-clamp-2 min-h-9 w-full text-[13.5px] leading-snug font-medium underline-offset-2 group-hover:underline"
+								>
+									{m.title}
+								</span>
+								<!-- The meta line doubles as the file manager's "size":
+								     how long it takes, and who put it here. Only docs
+								     somebody contributed are attributed; the creator's
+								     own belong to the share, not to a person. -->
+								<span
+									class="mt-auto block w-full min-w-0 truncate pt-1.5 font-mono text-[11px] text-ink-soft dark:text-slate-500"
+								>
+									{m.readMins} min read{#if m.contributorName}{' · '}<span class="sr-only"
+										>{'added by '}</span
+									>{m.contributorName}{/if}
+								</span>
+							</a>
+						{/if}
+					</li>
+				{/each}
+
+				<!-- Adding is a primary action in a file manager, so it is an entry
+				     in the grid rather than a panel bolted underneath it. Placed
+				     last, which also keeps the keyboard order tiles → form. -->
+				{#if data.canContribute}
+					<li
+						class="rise min-w-0"
+						style="animation-delay: {60 + Math.min(members.length * 26, 420)}ms"
+					>
+						<button
+							bind:this={addTileEl}
+							type="button"
+							onclick={() => (addOpen ? closeAddForm() : openAddForm())}
+							aria-expanded={addOpen}
+							aria-controls="add-doc-form"
+							class="group flex h-full w-full flex-col items-center border border-dashed border-line px-3 py-4 text-center transition hover:border-iris hover:text-iris sm:px-4 sm:py-5 dark:border-night-line"
+						>
+							<!-- The plus is drawn smaller than the document glyph, which would otherwise
+							     leave this tile a few pixels shorter wherever it sits alone on a
+							     row. A fixed icon slot keeps every tile's rhythm identical. -->
+							<span class="flex h-7 shrink-0 items-center justify-center sm:h-8">
+								<svg
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.5"
+									stroke-linecap="round"
+									aria-hidden="true"
+									class="size-6 shrink-0 text-ink-soft transition-colors group-hover:text-iris dark:text-slate-500 sm:size-7"
+								>
+									<path d="M12 5v14M5 12h14"></path>
+								</svg>
+							</span>
+							<span
+								class="mt-2.5 line-clamp-2 min-h-9 text-[13.5px] leading-snug font-semibold tracking-tight"
+							>
+								Add your own doc
+							</span>
+							<!-- Short enough to stay on one line at the narrowest tile, so
+							     this row's height matches the meta row on the doc tiles. -->
+							<span
+								class="mt-auto block w-full min-w-0 truncate pt-1.5 text-center font-mono text-[11px] text-ink-soft dark:text-slate-500"
+							>
+								New file
+							</span>
+						</button>
+					</li>
 				{/if}
-			{/each}
-		</div>
+			</ul>
+
+			<!-- Status bar: the window's tally line, kept under the contents. -->
+			<p
+				class="mt-6 border-t border-line pt-2.5 font-mono text-[11px] tracking-wide text-ink-soft dark:border-night-line dark:text-slate-500"
+			>
+				{statusLine}
+			</p>
+		{/if}
 
 		{#if live.length === 0 && dead.length > 0}
-			<p class="mt-8 text-center text-[15px] text-ink-soft dark:text-slate-400">
+			<p class="mt-6 text-center text-[15px] text-ink-soft dark:text-slate-400">
 				Every doc in this folder has since expired or hit its view limit.
 			</p>
 		{/if}
 
 		{#if data.canContribute}
-			<section class="mt-8 border border-line bg-surface p-4 sm:p-5 dark:border-night-line dark:bg-night-surface">
-				<button
-					type="button"
-					onclick={() => (addOpen = !addOpen)}
-					aria-expanded={addOpen}
-					aria-controls="add-doc-form"
-					class="flex w-full items-baseline justify-between gap-3 text-left"
+			<!-- The compose panel the add tile reveals. It sits directly under the
+			     grid so the tile → fields reading order is also the visual one. -->
+			{#if addOpen}
+				<section
+					class="rise mt-6 border border-line bg-surface dark:border-night-line dark:bg-night-surface"
 				>
-					<span class="font-display text-[15px] font-semibold tracking-tight">Add your own doc</span>
-					<span class="shrink-0 text-sm text-ink-soft dark:text-slate-400">
-						{addOpen ? 'Hide' : 'Open'}
-					</span>
-				</button>
-				<p class="mt-1.5 text-sm leading-relaxed text-ink-soft dark:text-slate-400">
-					Your doc joins the list for everyone who opens this folder. Adding one does not let you
-					edit anyone else's — yours stays yours, theirs stays theirs.
-				</p>
-
-				{#if addOpen}
-					<form
-						id="add-doc-form"
-						onsubmit={(e) => {
-							e.preventDefault();
-							contribute();
-						}}
-						class="mt-4"
+					<div
+						class="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5 dark:border-night-line"
 					>
-						<label class="block">
-							<span class="mb-1.5 block text-sm font-medium">Title</span>
-							<input
-								bind:value={addTitle}
-								maxlength="200"
-								placeholder="Document title"
-								class="w-full border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
-							/>
-						</label>
-						<label class="mt-4 block">
-							<span class="mb-1.5 block text-sm font-medium">Markdown</span>
-							<textarea
-								bind:value={addMarkdown}
-								oninput={() => {
-									addError = null;
-									addOk = null;
-								}}
-								rows="10"
-								spellcheck="false"
-								placeholder={'# Your doc\n\nWrite it in markdown.'}
-								class="w-full border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
-							></textarea>
-						</label>
-						<div class="mt-4">
-							<!-- Label is bound by id rather than wrapping: a button inside a
-							     <label> would also activate the label's control on click. -->
-							<label class="mb-1.5 block text-sm font-medium" for="add-name">
-								Your name
-								<span class="font-normal text-ink-soft dark:text-slate-500">(optional)</span>
-							</label>
-							<div class="flex gap-2">
+						<h2 class="font-display text-[15px] font-semibold tracking-tight">Add your own doc</h2>
+						<button
+							type="button"
+							onclick={closeAddForm}
+							class="shrink-0 text-sm font-medium text-ink-soft transition hover:text-iris dark:text-slate-400"
+						>
+							Cancel
+						</button>
+					</div>
+					<div class="p-4 sm:p-5">
+						<p class="text-sm leading-relaxed text-ink-soft dark:text-slate-400">
+							Your doc joins the list for everyone who opens this folder. Adding one does not let
+							you edit anyone else's — yours stays yours, theirs stays theirs.
+						</p>
+
+						<form
+							id="add-doc-form"
+							onsubmit={(e) => {
+								e.preventDefault();
+								contribute();
+							}}
+							class="mt-4"
+						>
+							<label class="block">
+								<span class="mb-1.5 block text-sm font-medium">Title</span>
 								<input
-									id="add-name"
-									bind:value={addName}
-									maxlength="60"
-									placeholder="Shown next to your doc"
+									bind:this={addTitleEl}
+									bind:value={addTitle}
+									maxlength="200"
+									placeholder="Document title"
 									class="w-full border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 								/>
-								<button
-									type="button"
-									onclick={rollName}
-									title="Fill in a random name"
-									class="shrink-0 border border-line px-3.5 py-2.5 text-[15px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
-								>
-									Random
-								</button>
+							</label>
+							<label class="mt-4 block">
+								<span class="mb-1.5 block text-sm font-medium">Markdown</span>
+								<textarea
+									bind:value={addMarkdown}
+									oninput={() => {
+										addError = null;
+										addOk = null;
+									}}
+									rows="10"
+									spellcheck="false"
+									placeholder={'# Your doc\n\nWrite it in markdown.'}
+									class="w-full border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+								></textarea>
+							</label>
+							<div class="mt-4">
+								<!-- Label is bound by id rather than wrapping: a button inside a
+								     <label> would also activate the label's control on click. -->
+								<label class="mb-1.5 block text-sm font-medium" for="add-name">
+									Your name
+									<span class="font-normal text-ink-soft dark:text-slate-500">(optional)</span>
+								</label>
+								<div class="flex gap-2">
+									<input
+										id="add-name"
+										bind:value={addName}
+										maxlength="60"
+										placeholder="Shown next to your doc"
+										class="w-full border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
+									/>
+									<button
+										type="button"
+										onclick={rollName}
+										title="Fill in a random name"
+										class="shrink-0 border border-line px-3.5 py-2.5 text-[15px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+									>
+										Random
+									</button>
+								</div>
 							</div>
-						</div>
-						{#if addError}
-							<p role="alert" class="mt-3 text-sm font-medium text-red-600 dark:text-red-300">
-								{addError}
-							</p>
-						{/if}
-						{#if addOk}
-							<p
-								role="status"
-								class="mt-3 border border-line bg-paper px-3 py-2.5 text-sm dark:border-night-line dark:bg-night/40"
+							{#if addError}
+								<p role="alert" class="mt-3 text-sm font-medium text-red-600 dark:text-red-300">
+									{addError}
+								</p>
+							{/if}
+							{#if addOk}
+								<p
+									role="status"
+									class="mt-3 border border-line bg-paper px-3 py-2.5 text-sm dark:border-night-line dark:bg-night/40"
+								>
+									{addOk}
+								</p>
+							{/if}
+							<button
+								type="submit"
+								disabled={addBusy}
+								class="btn-accent mt-4 inline-flex items-center justify-center px-5 py-2.5 text-[15px] font-semibold transition disabled:opacity-50"
 							>
-								{addOk}
-							</p>
-						{/if}
-						<button
-							type="submit"
-							disabled={addBusy}
-							class="btn-accent mt-4 inline-flex items-center justify-center px-5 py-2.5 text-[15px] font-semibold transition disabled:opacity-50"
-						>
-							{addBusy ? 'Adding…' : 'Add to folder'}
-						</button>
-					</form>
-				{/if}
-			</section>
+{addBusy ? 'Adding…' : 'Add to folder'}
+							</button>
+						</form>
+					</div>
+				</section>
+			{/if}
 		{/if}
 
-		<div class="mt-10 flex flex-wrap items-center justify-center gap-3 border-t border-line pt-8 dark:border-night-line">
+		<div
+			class="mt-10 flex flex-wrap items-center justify-center gap-3 border-t border-line pt-8 dark:border-night-line"
+		>
 			<button
 				type="button"
 				onclick={copyLink}
