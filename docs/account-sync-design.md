@@ -1,6 +1,18 @@
 # Optional Account Sync — Design
 
-Status: proposed. No code written.
+**Status: parked. No code written.** Kept as a record of a direction considered
+and not taken.
+
+What changed the calculus: folder shares (`/b/<id>`) now cover the "send someone
+many docs as one link" case without any identity system, and the capability-token
+model means no part of sharing needs to know who anyone is. That removed most of
+the pressure this design was answering. The cross-device library sync it
+envisions is still unsolved, still real, and still worth doing if someone wants
+it — but it is a convenience, not a foundation, and building it before the
+caps below is understood would be the wrong order.
+
+Read the Decision section below on its own terms; the design is sound, the
+timing is not.
 
 ## Decision
 
