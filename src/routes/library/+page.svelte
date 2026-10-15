@@ -3,6 +3,12 @@
 	import { page } from '$app/state';
 	import Toast from '$lib/components/Toast.svelte';
 	import DeleteDocButton from '$lib/components/DeleteDocButton.svelte';
+	import FileGlyph from '$lib/components/FileGlyph.svelte';
+	import FileRow from '$lib/components/FileRow.svelte';
+	import PaneHeader from '$lib/components/PaneHeader.svelte';
+	import SideRow from '$lib/components/SideRow.svelte';
+	import StatusBar from '$lib/components/StatusBar.svelte';
+	import { FILE_BOX_DASHED, FILE_CONTROL, RULE, SUBTLE } from '$lib/components/fileSkin';
 	import {
 		getShelf,
 		getFolders,
@@ -18,13 +24,13 @@
 	import type { DeleteResult } from '$lib/shelf';
 	import {
 		createBundleForFolder,
-	getBundles,
-	removeBundle,
-	listContributions,
-	removeContribution,
-	type BundleEntry,
-	type Contribution
-} from '$lib/bundles';
+		getBundles,
+		removeBundle,
+		listContributions,
+		removeContribution,
+		type BundleEntry,
+		type Contribution
+	} from '$lib/bundles';
 	import { themes } from '$lib/themes';
 	import { copyText } from '$lib/clipboard';
 
@@ -34,6 +40,11 @@
 	//
 	// Folders are local metadata over that shelf — there is no server-side
 	// owner to hang them off. Single-level by design; see src/lib/shelf.ts.
+	//
+	// Shape: the owner's own view of a shared folder, which the reader sees at
+	// /b/[id]. Same rule as that page — the container is typographic and the
+	// contents are boxed — so the rail and the header carry no boxes at all and
+	// every doc is a `FileRow`, the list-dressed twin of the reader's `DocTile`.
 
 	type Filter = { kind: 'all' } | { kind: 'none' } | { kind: 'folder'; id: string };
 
@@ -202,10 +213,20 @@
 		}
 	}
 
+	/**
+	 * Everything on this page is client-only — the shelf, the folders and the
+	 * folder links all live in localStorage, so the first paint has nothing.
+	 * `ready` only gates the *empty-state copy*: the page frame, the rail and
+	 * the counts render either way, but a returning owner should not see
+	 * "Nothing here yet" flash before their docs arrive.
+	 */
+	let ready = $state(false);
+
 	onMount(() => {
 		entries = getShelf();
 		folders = getFolders();
 		bundles = getBundles();
+		ready = true;
 		// Deep link from the reader's "Filed in" chip: /library?folder=<id>.
 		// Unknown ids fall through to All; the stale-folder $effect also guards.
 		const wanted = page.url.searchParams.get('folder');
@@ -292,14 +313,17 @@
 
 	/**
 	 * A bundle stores the docs it froze, not the folder it came from, so the
-	 * folder is recovered by intersecting those ids with the live shelf. A
-	 * bundle whose folder is gone (or whose docs all moved out) would otherwise
-	 * have nowhere to live, so it lands in the uncategorised group rather than
-	 * disappearing.
+	 * folder is recovered by intersecting those ids with the live shelf.
+	 *
+	 * Folder links are folded into the rail rather than kept as a second list.
+	 * A shared folder and the link that was sent for it are one thing the owner
+	 * thinks about, and this way they are drawn as one thing: the link hangs
+	 * off its folder's row, on a hairline spine, carrying its own Copy / Added
+	 * / Forget. A bundle whose folder is gone (or whose docs all moved out)
+	 * would otherwise have nowhere to live, so it lands under Uncategorised —
+	 * which is exactly where its docs are — rather than disappearing.
 	 */
-	type BundleGroup = { folder: Folder | null; items: BundleEntry[] };
-
-	const bundleGroups = $derived.by((): BundleGroup[] => {
+	const linksFor = $derived.by(() => {
 		const docFolder = new Map<string, string>();
 		for (const e of entries) if (e.folder) docFolder.set(e.id, e.folder);
 		const known = new Set(folders.map((f) => f.id));
@@ -311,17 +335,12 @@
 			if (owner) grouped.set(owner, [...(grouped.get(owner) ?? []), b]);
 			else orphans.push(b);
 		}
-
-		const groups: BundleGroup[] = folders
-			.filter((f) => grouped.has(f.id))
-			.map((f) => ({ folder: f, items: grouped.get(f.id) ?? [] }));
-		if (orphans.length) groups.push({ folder: null, items: orphans });
-		return groups;
+		return { byFolder: grouped, orphans };
 	});
 
-	/** Newest bundle for a folder — `getBundles` is newest first. */
-	function latestBundle(folderId: string): BundleEntry | null {
-		return bundleGroups.find((g) => g.folder?.id === folderId)?.items[0] ?? null;
+	/** Links belonging to one folder row, or the orphans under Uncategorised. */
+	function folderLinks(folderId: string | null): BundleEntry[] {
+		return folderId === null ? linksFor.orphans : (linksFor.byFolder.get(folderId) ?? []);
 	}
 
 	/**
@@ -474,6 +493,49 @@
 		entries = getShelf();
 	}
 
+	/* ------------------------------------------------------------ chrome */
+
+	/**
+	 * The pane header describes what this container *is*; the status bars answer
+	 * the separate questions of what it holds and what the current filter shows.
+	 * Counts deliberately stay out of the header — that is the folder page's rule
+	 * too, and a header that also counts stops being the container's name and
+	 * starts competing with what it holds.
+	 */
+	const headerMeta = 'Docs you have shared, and the folder links you have sent.';
+
+	const docsStatus = $derived.by(() => {
+		// Captured to a local so the narrowing survives into the callbacks below.
+		const f = filter;
+		const total = entries.length;
+		if (f.kind === 'all') return `${total} ${total === 1 ? 'doc' : 'docs'}`;
+		const n = visible.length;
+		if (f.kind === 'none') {
+			return `${n} of ${total} ${total === 1 ? 'doc' : 'docs'} · uncategorised`;
+		}
+		const name = folders.find((x) => x.id === f.id)?.name;
+		return `${n} of ${total} ${total === 1 ? 'doc' : 'docs'} · in ${name ?? 'that folder'}`;
+	});
+
+	const linksStatus = $derived(
+		`${bundles.length} ${bundles.length === 1 ? 'link' : 'links'} shared`
+	);
+
+	/** Whether anything at all is worth drawing a two-pane layout for. */
+	const hasShelf = $derived(entries.length > 0 || folders.length > 0 || bundles.length > 0);
+
+	/** The small quiet text button the rail's revealed actions use. */
+	const railBtn =
+		'rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris focus-visible:text-iris dark:text-slate-500';
+
+	/**
+	 * Inline rename / create input, matching the rest of the form styling.
+	 * `bg-surface` not `bg-paper`: the rail has no panel behind it, so the input
+	 * has to supply its own fill to stay legible against the page ground.
+	 */
+	const railInput =
+		'my-1 w-full min-w-0 rounded-sm border border-line bg-surface px-2 py-1 text-[13px] text-ink outline-none focus:border-iris dark:border-night-line dark:bg-night-surface dark:text-white';
+
 	/* ----------------------------------------------------------- drag/drop */
 
 	function onDragStart(e: DragEvent, id: string) {
@@ -492,19 +554,6 @@
 		onDragEnd();
 		if (id) moveTo(id, folderId);
 	}
-
-	const chip =
-		'rounded-sm border border-line bg-transparent px-2 py-1 text-[12px] text-ink-soft outline-none transition hover:border-iris hover:text-iris focus:border-iris dark:border-night-line dark:text-slate-400';
-	const navBtn =
-		'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] transition';
-	const rowBtn =
-		'shrink-0 rounded-sm border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]';
-	// Copy sits a step below Open/Options on the type scale, so the added
-	// control does not make the row any taller than it already was.
-	const copyBtn =
-		'shrink-0 rounded-sm border border-line px-2 py-1 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]';
-	const railBtn =
-		'rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris dark:text-slate-500';
 </script>
 
 <svelte:head>
@@ -512,129 +561,189 @@
 	<meta name="description" content="Docs shared from this browser." />
 </svelte:head>
 
-<main class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-	<h1 class="font-display text-2xl font-bold tracking-tight">Library</h1>
-	<p class="mt-1 text-sm text-ink-soft dark:text-slate-400">Docs you shared from this browser.</p>
+<main class="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
+	<!-- The container is typographic and rule-divided; everything inside it is
+	     boxed. Same `PaneHeader` the folder page uses, so an owner and a reader
+	     land on the same chrome. -->
+	<PaneHeader eyebrow="Library" title="Shared from this browser">
+		{#snippet meta()}{headerMeta}{/snippet}
+	</PaneHeader>
 
-	{#if entries.length || folders.length || bundles.length}
-		<div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-			<!-- folder rail -->
-			<nav class="w-full shrink-0 lg:sticky lg:top-6 lg:w-64" aria-label="Library folders">
-				<button
-					type="button"
-					class="{navBtn} {filter.kind === 'all'
-						? 'bg-surface text-ink dark:bg-night-surface dark:text-white'
-						: 'text-ink-soft hover:bg-surface dark:text-slate-400 dark:hover:bg-night-surface'}"
-					aria-current={filter.kind === 'all' ? 'page' : undefined}
+	{#if !ready}
+		<!-- Everything on this page lives in localStorage, so the first paint has
+		     nothing to show. Hold the page's height rather than flashing "Nothing
+		     here yet" at a returning owner for one frame. -->
+		<div class="min-h-[22rem]"></div>
+	{:else if !hasShelf}
+		<div class="mt-6 border border-dashed px-5 py-14 text-center {RULE}">
+			<p class="text-[15px] font-medium">This library is empty.</p>
+			<p class="mt-1.5 text-sm {SUBTLE}">
+				Share a doc and it lands here, along with any folder links you make.
+			</p>
+			<a
+				href="/"
+				class="btn-accent mt-6 inline-flex items-center justify-center px-5 py-2.5 text-[15px] font-semibold transition"
+			>
+				Share your first doc
+			</a>
+		</div>
+	{:else}
+		<div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+			<!-- ============================================ the rail
+			     A file manager's sidebar, which is exactly what this is: it filters
+			     the pane on the right by where a doc is filed, it is a drop target
+			     for filing by drag, and it is where a folder's own share lives. It is
+			     a container, so it stays typographic — no panel, no box — just rows
+			     on the page ground, divided by a hairline. Every row is a `SideRow`,
+			     so the filters, the folders and their links cannot drift apart. -->
+			<nav
+				class="w-full shrink-0 lg:sticky lg:top-6 lg:w-80 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:pb-2"
+				aria-label="Library folders"
+			>
+				<SideRow
+					label="All"
+					glyph="all"
+					count={entries.length}
+					active={filter.kind === 'all'}
 					onclick={() => (filter = { kind: 'all' })}
-				>
-					<span class="flex-1">All</span>
-					<span class="tabular-nums opacity-60">{entries.length}</span>
-				</button>
+					title="Every doc you have shared"
+				/>
 
-				<button
-					type="button"
-					class="{navBtn} {filter.kind === 'none'
-						? 'bg-surface text-ink dark:bg-night-surface dark:text-white'
-						: 'text-ink-soft hover:bg-surface dark:text-slate-400 dark:hover:bg-night-surface'}"
-					aria-current={filter.kind === 'none' ? 'page' : undefined}
-					ondragover={(e) => {
-						e.preventDefault();
-						dropTarget = '__none__';
-					}}
-					ondragleave={() => (dropTarget = dropTarget === '__none__' ? null : dropTarget)}
-					ondrop={(e) => {
-						e.preventDefault();
-						onDrop(null);
-					}}
-					onclick={() => (filter = { kind: 'none' })}
+				<!-- Uncategorised is a drop target in its own right: dragging a doc
+				     back onto it is how you unfile. -->
+			<SideRow
+				label="Uncategorised"
+				glyph="unfiled"
+				count={counts.none}
+				active={filter.kind === 'none'}
+				onclick={() => (filter = { kind: 'none' })}
+				dropping={dropTarget === '__none__'}
+				ondragover={(e) => {
+					e.preventDefault();
+					dropTarget = '__none__';
+				}}
+				ondragleave={() => (dropTarget = dropTarget === '__none__' ? null : dropTarget)}
+				ondrop={(e) => {
+					e.preventDefault();
+					onDrop(null);
+				}}
+			/>
+
+			<!-- A shared folder and the link that was sent for it are one thing the
+			     owner thinks about, so they are drawn as one thing: the link hangs
+			     off its folder's row. A link whose folder is gone lives under
+			     Uncategorised, which is where its docs ended up too — so the two
+			     places below share one row definition instead of two drifting
+			     copies of the same three buttons. -->
+			{#snippet linkRow(b: BundleEntry)}
+				<SideRow
+					child
+					label={bundlePath(b)}
+					glyph="link"
+					href={bundlePath(b)}
+					ariaLabel="Folder link for {b.title}"
+					title="{b.title} — opened {b.createdAt ? timeAgo(b.createdAt) : 'earlier'}"
 				>
-					<span class="flex-1">Uncategorised</span>
-					<span class="tabular-nums opacity-60">{counts.none}</span>
-				</button>
+					{#snippet actions()}
+						<button
+							type="button"
+							class={railBtn}
+							onclick={() => copyBundle(b)}
+							aria-label="Copy link for {b.title}"
+							title="Copy folder link"
+						>{copiedId === `bundle:${b.id}` ? 'Copied' : 'Copy'}</button>
+						<button
+							type="button"
+							class={railBtn}
+							onclick={() => openContributions(b)}
+							aria-label="Manage contributed docs in {b.title}"
+							title="Docs other people added"
+						>Added</button>
+						<button
+							type="button"
+							class={railBtn}
+							onclick={() => forgetBundle(b)}
+							aria-label="Forget the link for {b.title}"
+							title="Forget (the link keeps working for anyone who has it)"
+						>Forget</button>
+					{/snippet}
+				</SideRow>
+			{/snippet}
+
+			{#each folderLinks(null) as b (b.id)}
+				{@render linkRow(b)}
+			{/each}
+
 
 				{#if folders.length}
-					<div class="my-2 border-t border-line dark:border-night-line"></div>
+					<div class="my-2 border-t {RULE}"></div>
 				{/if}
 
 				{#each folders as f (f.id)}
-					{@const folderBundle = latestBundle(f.id)}
-					<div
-						class="group flex flex-wrap items-center gap-1 {filter.kind === 'folder' && filter.id === f.id
-							? 'bg-surface dark:bg-night-surface'
-							: ''} {dropTarget === f.id ? 'ring-1 ring-iris' : ''} rounded-sm"
-						ondragover={(e) => {
-							e.preventDefault();
-							dropTarget = f.id;
-						}}
-						ondragleave={() => (dropTarget = dropTarget === f.id ? null : dropTarget)}
-						ondrop={(e) => {
-							e.preventDefault();
-							onDrop(f.id);
-						}}
-						role="none"
-					>
-						{#if renamingId === f.id}
-							<!-- svelte-ignore a11y_autofocus -->
-							<input
-								bind:value={renameDraft}
-								onblur={commitRename}
-								onkeydown={(e) => {
-									if (e.key === 'Enter') commitRename();
-									if (e.key === 'Escape') renamingId = null;
-								}}
-								autofocus
-								maxlength="40"
-								class="my-1 w-full min-w-0 rounded-sm border border-line bg-surface px-2 py-1 text-[13px] text-ink outline-none focus:border-iris dark:border-night-line dark:bg-night-surface dark:text-white"
-							/>
-						{:else}
-							<!-- The rail is 256px: four text actions do not fit beside a long folder
-							     name, so the row wraps them onto their own line rather than
-							     letting them spill over the doc list. -->
-							<button
-								type="button"
-								class="{navBtn} {filter.kind === 'folder' && filter.id === f.id
-									? 'text-ink dark:text-white'
-									: 'text-ink-soft hover:bg-surface dark:text-slate-400 dark:hover:bg-night-surface'}"
-								aria-current={filter.kind === 'folder' && filter.id === f.id ? 'page' : undefined}
-								onclick={() => (filter = { kind: 'folder', id: f.id })}
-							>
-								<span class="min-w-0 flex-1 truncate">{f.name}</span>
-								<span class="tabular-nums opacity-60">{counts.byFolder.get(f.id) ?? 0}</span>
-							</button>
-							<span class="hidden shrink-0 gap-0.5 group-hover:flex focus-within:flex lg:flex">
-								{#if folderBundle}
-									<button
-										type="button"
-										class={railBtn}
-										onclick={() => copyBundle(folderBundle)}
-										aria-label="Copy link for {f.name}">{copiedId === `bundle:${folderBundle.id}`
-											? 'Copied'
-											: 'Copy'}</button
-									>
-								{/if}
-								<button
-									type="button"
-									class={railBtn}
-									onclick={() => startRename(f)}
-									aria-label="Rename {f.name}">Rename</button
-								>
+					{@const isActive = filter.kind === 'folder' && filter.id === f.id}
+					{#if renamingId === f.id}
+						<!-- svelte-ignore a11y_autofocus -->
+						<input
+							bind:value={renameDraft}
+							onblur={commitRename}
+							onkeydown={(e) => {
+								if (e.key === 'Enter') commitRename();
+								if (e.key === 'Escape') renamingId = null;
+							}}
+							autofocus
+							maxlength="40"
+							aria-label="New name for {f.name}"
+							class={railInput}
+						/>
+					{:else}
+						<SideRow
+							label={f.name}
+							glyph="folder"
+							count={counts.byFolder.get(f.id) ?? 0}
+							active={isActive}
+							title="Show only {f.name}"
+							onclick={() => (filter = { kind: 'folder', id: f.id })}
+							dropping={dropTarget === f.id}
+							ondragover={(e) => {
+								e.preventDefault();
+								dropTarget = f.id;
+							}}
+							ondragleave={() => (dropTarget = dropTarget === f.id ? null : dropTarget)}
+							ondrop={(e) => {
+								e.preventDefault();
+								onDrop(f.id);
+							}}
+						>
+							{#snippet actions()}
 								<button
 									type="button"
 									class="{railBtn} disabled:opacity-40"
 									onclick={() => openFolderOptions(f)}
 									disabled={sharingFolderId === f.id}
-									aria-label="Share {f.name} as one link">Share</button
-								>
+									aria-label="Share {f.name} as one link"
+									title="Share as one link"
+								>{sharingFolderId === f.id ? '…' : 'Share'}</button>
+								<button
+									type="button"
+									class={railBtn}
+									onclick={() => startRename(f)}
+									aria-label="Rename {f.name}"
+									title="Rename"
+								>Rename</button>
 								<button
 									type="button"
 									class={railBtn}
 									onclick={() => removeFolder(f)}
-									aria-label="Delete {f.name}">Delete</button
-								>
-							</span>
-						{/if}
-					</div>
+									aria-label="Delete {f.name}"
+									title="Delete — its docs move to Uncategorised"
+								>Delete</button>
+							{/snippet}
+						</SideRow>
+					{/if}
+
+					{#each folderLinks(f.id) as b (b.id)}
+						{@render linkRow(b)}
+					{/each}
 				{/each}
 
 				{#if creating}
@@ -649,160 +758,127 @@
 						autofocus
 						maxlength="40"
 						placeholder="Folder name"
-						class="my-1 w-full rounded-sm border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-iris dark:border-night-line dark:bg-night-surface dark:text-white"
+						aria-label="New folder name"
+						class={railInput}
 					/>
 				{:else}
+					<!-- Creating a folder is a primary action here, so it wears the same
+					     dashed treatment as the "add a doc" tile in a folder's grid. -->
 					<button
 						type="button"
-						class="{navBtn} mt-1 text-ink-soft hover:text-iris dark:text-slate-500"
+						class="mt-1 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] font-medium transition hover:border-iris hover:text-iris {FILE_BOX_DASHED}"
 						onclick={() => {
 							creating = true;
 							newName = '';
 						}}
 					>
-						+ New folder
+						<FileGlyph kind="plus" class="size-4 shrink-0" />
+						New folder
 					</button>
 				{/if}
 
 				<p class="mt-3 text-[11px] leading-snug text-ink-soft/70 dark:text-slate-600">
-					Drag a doc onto a folder to file it. Folders live in this browser only.
+					Drag a doc onto a folder to file it, or use the menu on any row. Folders and these
+					links live in this browser only.
 				</p>
+
+				<!-- The rail has its own tally for the same reason the pane does:
+				     counts belong on a status bar, never in the header. -->
+				<StatusBar text={linksStatus} />
 			</nav>
 
-			<!-- doc list -->
+			<!-- ============================================ contents -->
 			<div class="min-w-0 flex-1">
 				{#if visible.length}
-					<ul
-						class="divide-y divide-line overflow-hidden border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface"
-					>
+					<ul class="flex flex-col gap-2">
 						{#each visible as entry (entry.id)}
-							<li
-								class="flex flex-wrap items-center gap-1 px-3.5 py-2.5 sm:flex-nowrap {dragId === entry.id
-									? 'opacity-40'
-									: ''}"
-								draggable="true"
+							<!-- The name is the link, exactly as in any file manager. `Open` stays
+							     in the revealed actions so the explicit verb is not lost, and it
+							     costs the row nothing at rest because those actions are laid over
+							     the name rather than reserving space beside it. -->
+							<FileRow
+								label={entry.title}
+								href={docPath(entry)}
+								draggable
 								ondragstart={(e) => onDragStart(e, entry.id)}
 								ondragend={onDragEnd}
+								dimmed={dragId === entry.id}
 							>
-								<span class="min-w-0 flex-1">
-									<span class="block truncate text-sm font-medium">{entry.title}</span>
-									<span
-										class="mt-0.5 block truncate font-mono text-[11px] text-ink-soft dark:text-slate-500"
-										>{docPath(entry)}{entry.createdAt ? ` · ${timeAgo(entry.createdAt)}` : ''}</span
+								{#snippet meta()}
+									{docPath(entry)}{entry.createdAt ? ` · ${timeAgo(entry.createdAt)}` : ''}
+								{/snippet}
+								{#snippet control()}
+									<!-- Capped: an uncapped select sizes to its longest folder name and
+									     starves the document title of the row. -->
+									<select
+										class="{FILE_CONTROL} w-36 truncate bg-paper sm:w-40"
+										value={entry.folder ?? ''}
+										aria-label="Folder for {entry.title}"
+										onchange={(e) => moveTo(entry.id, e.currentTarget.value || null)}
 									>
-								</span>
-								<select
-									class={chip}
-									value={entry.folder ?? ''}
-									aria-label="Folder for {entry.title}"
-									onchange={(e) => moveTo(entry.id, e.currentTarget.value || null)}
-								>
-									<option value="">Uncategorised</option>
-									{#each folders as f (f.id)}
-										<option value={f.id}>{f.name}</option>
-									{/each}
-								</select>
-<!-- A title and this many controls cannot share a phone-width line, so the
-							     controls take their own row there rather than squeezing the title
-							     to nothing or letting the row scroll sideways. -->
-								<div class="flex w-full shrink-0 items-center gap-1 sm:w-auto">
-									<a href={docPath(entry)} class={rowBtn}>Open</a>
+										<option value="">Uncategorised</option>
+										{#each folders as f (f.id)}
+											<option value={f.id}>{f.name}</option>
+										{/each}
+									</select>
+								{/snippet}
+								{#snippet actions()}
+									<a href={docPath(entry)} class={FILE_CONTROL}>Open</a>
 									<button
 										type="button"
-										class={copyBtn}
+										class={FILE_CONTROL}
 										onclick={() => copyDoc(entry)}
 										aria-label="Copy link for {entry.title}"
-									>
-										{copiedId === `doc:${entry.id}` ? 'Copied' : 'Copy'}
-									</button>
+									>{copiedId === `doc:${entry.id}` ? 'Copied' : 'Copy'}</button>
 									<button
 										type="button"
+										class={FILE_CONTROL}
 										onclick={() => openDocSettings(entry)}
-										class={rowBtn}
 										aria-label="Link settings for {entry.title}"
+									>Options</button>
+									<!-- Delete keeps its own arm-then-confirm button; the frame around it
+									     is here so a bare × is not the only unboxed thing in a row of
+									     boxed controls. -->
+									<span
+										class="flex shrink-0 items-center rounded-sm border border-line px-2 py-1 dark:border-night-line"
 									>
-										Options
-									</button>
-									<DeleteDocButton id={entry.id} title={entry.title} {onDeleted} {onDeleteFailed} />
-								</div>
-							</li>
+										<DeleteDocButton
+											id={entry.id}
+											title={entry.title}
+											{onDeleted}
+											{onDeleteFailed}
+										/>
+									</span>
+								{/snippet}
+							</FileRow>
 						{/each}
 					</ul>
 				{:else}
-					<p class="text-sm text-ink-soft dark:text-slate-400">
-						{filter.kind === 'folder' ? 'No docs in this folder yet.' : 'Nothing here yet.'}
-					</p>
-				{/if}
-
-				{#if bundleGroups.length}
-					<section class="mt-6" aria-labelledby="folder-links-heading">
-						<h2 id="folder-links-heading" class="font-display text-sm font-bold tracking-tight">
-							Folder links
-						</h2>
-						<p class="mt-1 text-[13px] text-ink-soft dark:text-slate-400">
-							Every folder link shared from this browser. Copy one instead of sharing the folder again —
-							forgetting one only drops it from this list, it keeps working for anyone who has it.
+					<div class="border border-dashed px-5 py-12 text-center {RULE}">
+						<p class="text-[15px] font-medium">
+							{filter.kind === 'folder' ? 'This folder is empty.' : 'Nothing here yet.'}
 						</p>
-
-						{#each bundleGroups as group (group.folder?.id ?? '__uncategorised__')}
-							<div class="mt-4">
-								<h3 class="text-xs font-semibold tracking-wide text-ink-soft uppercase dark:text-slate-500">
-									{group.folder?.name ?? 'Uncategorised'}
-								</h3>
-								<ul
-									class="mt-1.5 divide-y divide-line border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface"
-								>
-									{#each group.items as b (b.id)}
-										<li class="flex items-center gap-1 px-3.5 py-2.5">
-											<span class="min-w-0 flex-1">
-												<span class="block truncate text-sm font-medium">{b.title}</span>
-												<span
-													class="mt-0.5 block truncate font-mono text-[11px] text-ink-soft dark:text-slate-500"
-													>{bundlePath(b)}{b.createdAt ? ` · ${timeAgo(b.createdAt)}` : ''}</span
-												>
-											</span>
-											<button
-												type="button"
-												class={copyBtn}
-												onclick={() => copyBundle(b)}
-												aria-label="Copy link for {b.title}"
-											>
-												{copiedId === `bundle:${b.id}` ? 'Copied' : 'Copy'}
-											</button>
-											<button
-												type="button"
-												class={rowBtn}
-												onclick={() => openContributions(b)}
-												aria-label="Manage contributed docs in {b.title}"
-											>
-												Added
-											</button>
-											<button
-												type="button"
-												class={rowBtn}
-												onclick={() => forgetBundle(b)}
-												aria-label="Forget the link for {b.title}"
-											>
-												Forget
-											</button>
-										</li>
-									{/each}
-								</ul>
-							</div>
-						{/each}
-					</section>
+						<p class="mt-1.5 text-sm {SUBTLE}">
+							{filter.kind === 'folder'
+								? 'Drag a doc onto this folder, or pick a folder from any row.'
+								: 'Share a doc and it lands here.'}
+						</p>
+					</div>
 				{/if}
+
+				<StatusBar text={docsStatus} />
 			</div>
 		</div>
-	{:else}
-		<p class="mt-6 text-sm text-ink-soft dark:text-slate-400">Nothing here yet. Shared docs appear here.</p>
 	{/if}
 
-	<a
-		href="/"
-		class="mt-6 inline-block rounded-sm border border-line px-4 py-2 text-sm font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
-		>Back home</a
-	>
+	<div class="mt-10 flex flex-wrap items-center justify-center gap-3 border-t pt-8 {RULE}">
+		<a
+			href="/"
+			class="btn-accent inline-flex items-center justify-center px-5 py-2.5 text-[15px] font-semibold transition"
+		>
+			Share a new doc
+		</a>
+	</div>
 </main>
 
 <Toast message={toast?.message ?? null} kind={toast?.kind ?? 'ok'} />

@@ -6,6 +6,10 @@
 	import HowItWorksModal from '$lib/components/HowItWorksModal.svelte';
 	import BackLink from '$lib/components/BackLink.svelte';
 	import BackToTop from '$lib/components/BackToTop.svelte';
+	import DocTile from '$lib/components/DocTile.svelte';
+	import PaneHeader from '$lib/components/PaneHeader.svelte';
+	import StatusBar from '$lib/components/StatusBar.svelte';
+	import { RULE, SUBTLE } from '$lib/components/fileSkin';
 	import { noteViewed } from '$lib/recent';
 	import { addToShelf } from '$lib/shelf';
 	import {
@@ -53,7 +57,7 @@
 	let addOk = $state<string | null>(null);
 	// The add tile lives in the file grid, so opening the form can leave it
 	// above the fold on a long folder. Both ends keep focus on the tile.
-	let addTileEl = $state<HTMLButtonElement | null>(null);
+	let addTileEl = $state<HTMLElement | null>(null);
 	let addTitleEl = $state<HTMLInputElement | null>(null);
 
 	// Docs added from this page, shown immediately instead of via a reload:
@@ -450,66 +454,20 @@ const out = (await res.json().catch(() => ({}))) as {
 		</div>
 	</main>
 {:else}
-	<!-- The one document glyph for the whole folder. Every member is markdown,
-	     so varied icons would be fiction; a single page-with-a-folded-corner,
-	     hairline-stroked and inheriting colour, carries the type instead. -->
-	{#snippet docGlyph(cls: string)}
-		<svg
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="1.5"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-			aria-hidden="true"
-			class={cls}
-		>
-			<path d="M14 2.5H7A1.5 1.5 0 0 0 5.5 4v16A1.5 1.5 0 0 0 7 21.5h10a1.5 1.5 0 0 0 1.5-1.5V7z"
-			></path>
-			<path d="M14 2.5V7h4.5"></path>
-			<path d="M8.75 12.5h6.5M8.75 16h4.5"></path>
-		</svg>
-	{/snippet}
-
 	<main class="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
 		<div class="mb-6"><BackLink href="/library" label="Library" /></div>
 
-		<!-- Folder header. Deliberately unboxed and set apart by a single rule:
-		     the contents below are boxes, and a boxed header would sit at the
-		     same weight as its own members. -->
-		<header class="flex items-start gap-4 border-b border-line pb-6 dark:border-night-line">
-			<svg
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.5"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
-				class="mt-1.5 size-8 shrink-0 text-ink-soft dark:text-slate-500"
-			>
-				<path
-					d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
-				></path>
-			</svg>
-			<div class="min-w-0 flex-1">
-				<p class="text-xs tracking-widest text-ink-soft uppercase dark:text-slate-500">Folder</p>
-				<h1 class="font-display mt-2 text-3xl font-bold tracking-tight break-words sm:text-4xl">
-					{data.title}
-				</h1>
-				<p class="mt-2 text-sm text-ink-soft dark:text-slate-400">
-					Shared {timeAgo(data.createdAt)} · {data.views}
-					{data.views === 1 ? 'view' : 'views'}
-				</p>
-			</div>
-		</header>
+		<PaneHeader eyebrow="Folder" title={data.title}>
+			{#snippet meta()}
+				Shared {timeAgo(data.createdAt)} · {data.views}
+				{data.views === 1 ? 'view' : 'views'}
+			{/snippet}
+		</PaneHeader>
 
 		{#if members.length === 0}
-			<div
-				class="mt-6 border border-dashed border-line px-5 py-12 text-center dark:border-night-line"
-			>
+			<div class="mt-6 border border-dashed px-5 py-12 text-center {RULE}">
 				<p class="text-[15px] font-medium">This folder is empty.</p>
-				<p class="mt-1.5 text-sm text-ink-soft dark:text-slate-400">
+				<p class="mt-1.5 text-sm {SUBTLE}">
 					{data.canContribute
 						? 'Be the first to put a doc in it.'
 						: 'Nobody has put a doc in it yet.'}
@@ -526,55 +484,31 @@ const out = (await res.json().catch(() => ({}))) as {
 					<li class="rise min-w-0" style="animation-delay: {60 + Math.min(i * 26, 420)}ms">
 						{#if m.gone}
 							<!-- Unavailable members stay visible and stay in the creator's
-							     order, but are a div, never an anchor: there is no link
-							     to a page that would only bounce the reader. Dashed
-							     outline and a struck title say "not here" at a glance. -->
-							<div
-								class="flex h-full flex-col items-center border border-dashed border-line px-3 py-4 text-center opacity-70 sm:px-4 sm:py-5 dark:border-night-line"
+							     order, but are never an anchor: there is no link to a page
+							     that would only bounce the reader. Dashed outline and a
+							     struck title say "not here" at a glance. -->
+							<DocTile
+								label={m.title}
+								dashed
+								glyphDashed
+								faint
+								strike
+								tooltip={m.title}
 							>
-								{@render docGlyph(
-									'size-7 shrink-0 text-ink-soft [stroke-dasharray:3_2.5] sm:size-8'
-								)}
-								<span
-									class="mt-2.5 line-clamp-2 min-h-9 w-full text-[13.5px] leading-snug font-medium text-ink-soft line-through decoration-1 dark:text-slate-500"
-									title={m.title}
-								>
-									{m.title}
-								</span>
-								<span
-									class="mt-auto block w-full truncate pt-1.5 text-center font-mono text-[10px] tracking-[0.12em] text-ink-soft uppercase dark:text-slate-500"
-								>
-									{m.gone === 'expired' ? 'expired' : 'view limit'}
-								</span>
-							</div>
+								{#snippet meta()}
+									<span class="text-[10px] tracking-[0.12em] uppercase">
+										{m.gone === 'expired' ? 'expired' : 'view limit'}
+									</span>
+								{/snippet}
+							</DocTile>
 						{:else}
-							<a
-								href={memberHref(m)}
-								title={memberSummary(m)}
-								class="group flex h-full flex-col items-center border border-line bg-surface px-3 py-4 text-center transition hover:border-iris dark:border-night-line dark:bg-night-surface sm:px-4 sm:py-5"
-							>
-								{@render docGlyph(
-									'size-7 shrink-0 text-ink-soft transition-colors group-hover:text-iris dark:text-slate-500 sm:size-8'
-								)}
-								<!-- min-h-9 holds two lines so one-line titles do not
-								     unbalance their row against longer neighbours. -->
-								<span
-									class="mt-2.5 line-clamp-2 min-h-9 w-full text-[13.5px] leading-snug font-medium underline-offset-2 group-hover:underline"
-								>
-									{m.title}
-								</span>
-								<!-- The meta line doubles as the file manager's "size":
-								     how long it takes, and who put it here. Only docs
-								     somebody contributed are attributed; the creator's
-								     own belong to the share, not to a person. -->
-								<span
-									class="mt-auto block w-full min-w-0 truncate pt-1.5 font-mono text-[11px] text-ink-soft dark:text-slate-500"
-								>
+							<DocTile label={m.title} href={memberHref(m)} tooltip={memberSummary(m)}>
+								{#snippet meta()}
 									{m.readMins} min read{#if m.contributorName}{' · '}<span class="sr-only"
 										>{'added by '}</span
 									>{m.contributorName}{/if}
-								</span>
-							</a>
+								{/snippet}
+							</DocTile>
 						{/if}
 					</li>
 				{/each}
@@ -587,57 +521,28 @@ const out = (await res.json().catch(() => ({}))) as {
 						class="rise min-w-0"
 						style="animation-delay: {60 + Math.min(members.length * 26, 420)}ms"
 					>
-						<button
-							bind:this={addTileEl}
-							type="button"
-							onclick={() => (addOpen ? closeAddForm() : openAddForm())}
+						<DocTile
+							as="button"
+							label="Add your own doc"
+							glyph="plus"
+							dashed
+							tooltip="Add your own doc"
 							aria-expanded={addOpen}
 							aria-controls="add-doc-form"
-							class="group flex h-full w-full flex-col items-center border border-dashed border-line px-3 py-4 text-center transition hover:border-iris hover:text-iris sm:px-4 sm:py-5 dark:border-night-line"
+							onclick={() => (addOpen ? closeAddForm() : openAddForm())}
+							bind:el={addTileEl}
 						>
-							<!-- The plus is drawn smaller than the document glyph, which would otherwise
-							     leave this tile a few pixels shorter wherever it sits alone on a
-							     row. A fixed icon slot keeps every tile's rhythm identical. -->
-							<span class="flex h-7 shrink-0 items-center justify-center sm:h-8">
-								<svg
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="1.5"
-									stroke-linecap="round"
-									aria-hidden="true"
-									class="size-6 shrink-0 text-ink-soft transition-colors group-hover:text-iris dark:text-slate-500 sm:size-7"
-								>
-									<path d="M12 5v14M5 12h14"></path>
-								</svg>
-							</span>
-							<span
-								class="mt-2.5 line-clamp-2 min-h-9 text-[13.5px] leading-snug font-semibold tracking-tight"
-							>
-								Add your own doc
-							</span>
-							<!-- Short enough to stay on one line at the narrowest tile, so
-							     this row's height matches the meta row on the doc tiles. -->
-							<span
-								class="mt-auto block w-full min-w-0 truncate pt-1.5 text-center font-mono text-[11px] text-ink-soft dark:text-slate-500"
-							>
-								New file
-							</span>
-						</button>
+							{#snippet meta()}New file{/snippet}
+						</DocTile>
 					</li>
 				{/if}
 			</ul>
 
-			<!-- Status bar: the window's tally line, kept under the contents. -->
-			<p
-				class="mt-6 border-t border-line pt-2.5 font-mono text-[11px] tracking-wide text-ink-soft dark:border-night-line dark:text-slate-500"
-			>
-				{statusLine}
-			</p>
+			<StatusBar text={statusLine} />
 		{/if}
 
 		{#if live.length === 0 && dead.length > 0}
-			<p class="mt-6 text-center text-[15px] text-ink-soft dark:text-slate-400">
+			<p class="mt-6 text-center text-[15px] {SUBTLE}">
 				Every doc in this folder has since expired or hit its view limit.
 			</p>
 		{/if}
