@@ -1,8 +1,10 @@
-import { asc, eq, inArray, sql } from 'drizzle-orm';
+import { asc, and, eq, inArray, sql } from 'drizzle-orm';
+import { nanoid } from 'nanoid';
+import { randomBytes } from 'node:crypto';
 import { db } from './db';
 import { bundleItems, bundles, documents, type Bundle } from './db/schema';
-import { gateDoc, resolveDoc, type Gate } from './docs';
-import { verifyPassword } from './password';
+import { deleteDoc, gateDoc, resolveDoc, type Gate } from './docs';
+import { hashPassword, verifyPassword } from './password';
 
 export type BundleGate = Gate;
 
@@ -53,6 +55,9 @@ export interface BundleMember {
 	href: string;
 	createdAt: number;
 	readMins: number;
+	/** Display name for a doc someone else added; null for docs the bundle
+	 *  creator included, which are attributed to the share rather than a person. */
+	contributorName: string | null;
 	/** Per-member state. Members are ungated at creation, but one can still
 	 *  expire or run out of views afterwards — the index reports that honestly
 	 *  instead of rendering a link to a dead page. */
@@ -60,13 +65,19 @@ export interface BundleMember {
 }
 
 /**
- * Members in frozen creator order, with per-member gate state resolved.
+ * Members in frozen creator order, with per-member gate state resolved. Docs
+ * contributed later append to the end, so the creator's ordering is never
+ * disturbed by anyone else adding to the folder.
  * A doc deleted since the bundle was made simply drops out — membership is a
  * join row, so shrinking is the only way a member can disappear.
  */
 export async function getBundleMembers(bundleId: string): Promise<BundleMember[]> {
 	const rows = await db
-		.select({ docId: bundleItems.docId, position: bundleItems.position })
+		.select({
+			docId: bundleItems.docId,
+			position: bundleItems.position,
+			contributorName: bundleItems.contributorName
+		})
 		.from(bundleItems)
 		.where(eq(bundleItems.bundleId, bundleId))
 		.orderBy(asc(bundleItems.position))
@@ -96,6 +107,7 @@ export async function getBundleMembers(bundleId: string): Promise<BundleMember[]
 			href: `/s/${doc.slug ?? doc.id}`,
 			createdAt: doc.createdAt,
 			readMins: Math.max(1, Math.ceil(words / 200)),
+			contributorName: row.contributorName,
 			gone
 		});
 	}
@@ -186,4 +198,141 @@ export async function findGatedMember(
 		if (doc.maxViews !== null) return { docId: id, gate: 'views' };
 	}
 	return undefined;
+}
+
+/**
+ * Ceiling on a bundle's membership once contributions are in play. Creation caps
+ * at 50, but contributions accumulate over the life of a link rather than being
+ * chosen once, so they get more headroom — still bounded, because an unbounded
+ * list is both a spam target and a slow page for every reader.
+ */
+export const MAX_MEMBERS_WITH_CONTRIBUTIONS = 200;
+
+/**
+ * Append a doc to a bundle on behalf of someone holding the folder password.
+ *
+ * Append-only by construction: the returned capability token is minted for the
+ * new document alone, and that token is the only thing the rest of the system
+ * accepts as proof of authority over a doc. A contributor therefore cannot edit
+ * or delete anything they did not create, and neither can the bundle creator
+ * (who holds no token for a contribution they never made).
+ *
+ * The doc is created ungated, matching the rule that one bundle gate governs the
+ * whole share — a member carrying its own password would leave readers unlocking
+ * the index and then hitting a second lock inside it.
+ */
+export async function contributeDoc(
+	bundleId: string,
+	title: string,
+	rawMarkdown: string,
+	html: string,
+	contributorName: string | null
+): Promise<{ ok: true; docId: string; deleteToken: string } | { ok: false; reason: 'full' }> {
+	const stats = await db
+		.select({
+			count: sql<number>`count(*)`,
+			maxPos: sql<number>`coalesce(max(${bundleItems.position}), -1)`
+		})
+		.from(bundleItems)
+		.where(eq(bundleItems.bundleId, bundleId))
+		.get();
+
+	if ((stats?.count ?? 0) >= MAX_MEMBERS_WITH_CONTRIBUTIONS) return { ok: false, reason: 'full' };
+
+	const docId = nanoid(8);
+	// Same capability discipline as every other doc: 32 random bytes, scrypt at
+	// rest, plaintext handed back exactly once so the contributor can manage
+	// their own file and nothing else.
+	const deleteToken = randomBytes(32).toString('hex');
+
+	await db
+		.insert(documents)
+		.values({
+			id: docId,
+			title,
+			rawMarkdown,
+			html,
+			createdAt: Date.now(),
+			views: 0,
+			slug: null,
+			passwordHash: null,
+			deleteTokenHash: hashPassword(deleteToken),
+			expiresAt: null,
+			maxViews: null
+		})
+		.run();
+
+	await db
+		.insert(bundleItems)
+		.values({
+			bundleId,
+			docId,
+			// Appended, so the creator's frozen ordering is never disturbed.
+			position: (stats?.maxPos ?? -1) + 1,
+			contributorName
+		})
+		.run();
+
+	return { ok: true, docId, deleteToken };
+}
+
+/**
+ * List the docs other people added to a folder, for the creator's own Library.
+ *
+ * Only contributions are returned. The creator's original members are already
+ * in their Library under their own delete tokens, so surfacing them here too
+ * would duplicate rows and imply the removal route could reach them — it
+ * deliberately cannot.
+ */
+export async function listContributedMembers(
+	bundleId: string
+): Promise<{ docId: string; title: string; contributorName: string; createdAt: number }[]> {
+	const rows = await db
+		.select({ docId: bundleItems.docId, contributorName: bundleItems.contributorName })
+		.from(bundleItems)
+		.where(and(eq(bundleItems.bundleId, bundleId), sql`${bundleItems.contributorName} is not null`))
+		.orderBy(asc(bundleItems.position))
+		.all();
+	if (rows.length === 0) return [];
+
+	const docs = await db
+		.select({ id: documents.id, title: documents.title, createdAt: documents.createdAt })
+		.from(documents)
+		.where(inArray(documents.id, rows.map((r) => r.docId)))
+		.all();
+	const byId = new Map(docs.map((d) => [d.id, d]));
+
+	return rows.flatMap((r) => {
+		const doc = byId.get(r.docId);
+		// A deleted contribution drops out rather than showing as a dead row.
+		if (!doc || !r.contributorName) return [];
+		return [{ docId: doc.id, title: doc.title, contributorName: r.contributorName, createdAt: doc.createdAt }];
+	});
+}
+
+/**
+ * Remove a contributed doc using the bundle's own delete token.
+ *
+ * Deliberately scoped to contributions only: a doc the creator put in stays
+ * theirs, managed from their Library, so this can never become a way to delete
+ * somebody else's work. The membership row is dropped first, because a doc left
+ * behind with no membership row would be invisible but still live on its own
+ * /s/<id> link.
+ */
+export async function removeContributedMember(
+	bundle: Bundle,
+	docId: string
+): Promise<{ ok: true } | { ok: false; reason: 'unknown' | 'not-a-contribution' | 'failed' }> {
+	const item = await db
+		.select({ contributorName: bundleItems.contributorName })
+		.from(bundleItems)
+		.where(and(eq(bundleItems.bundleId, bundle.id), eq(bundleItems.docId, docId)))
+		.get();
+
+	if (!item) return { ok: false, reason: 'unknown' };
+	if (!item.contributorName) return { ok: false, reason: 'not-a-contribution' };
+
+	const doc = await resolveDoc(docId);
+	if (doc) await deleteDoc(docId);
+	return { ok: true };
 }

@@ -11,11 +11,21 @@
 		deleteFolder,
 		setDocFolder,
 		updateDocLinkSettings,
+		updateShelfSlug,
 		type ShelfEntry,
 		type Folder
 	} from '$lib/shelf';
 	import type { DeleteResult } from '$lib/shelf';
-	import { createBundleForFolder } from '$lib/bundles';
+	import {
+		createBundleForFolder,
+	getBundles,
+	removeBundle,
+	listContributions,
+	removeContribution,
+	type BundleEntry,
+	type Contribution
+} from '$lib/bundles';
+	import { themes } from '$lib/themes';
 	import { copyText } from '$lib/clipboard';
 
 	// Library: docs shared from this browser (the silent-token shelf).
@@ -29,9 +39,14 @@
 
 	let entries = $state<ShelfEntry[]>([]);
 	let folders = $state<Folder[]>([]);
+	/** Folder links shared from this browser, so they can be copied again later. */
+	let bundles = $state<BundleEntry[]>([]);
 	let filter = $state<Filter>({ kind: 'all' });
 	let toast = $state<{ message: string; kind: 'ok' | 'error' } | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | null = null;
+	/** Id of the row whose copy button last succeeded, for the 1600ms "Copied". */
+	let copiedId = $state<string | null>(null);
+	let copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let creating = $state(false);
 	let newName = $state('');
@@ -55,6 +70,9 @@
 		return typeof v === 'string' ? v : v == null ? '' : String(v);
 	}
 	let optSlug = $state('');
+	/** Creator's colourway for the folder page. Empty means "no preference" —
+	 *  the server stores null and the folder falls back to the reader's own theme. */
+	let optTheme = $state('');
 	let optError = $state<string | null>(null);
 
 	const SLUG_RE = /^[a-z0-9-]{3,32}$/;
@@ -80,6 +98,7 @@
 		optExpiry = '0';
 		optMaxViews = '';
 		optSlug = '';
+		optTheme = '';
 		optError = null;
 	}
 
@@ -170,9 +189,11 @@
 			}
 			// The slug is baked into the shelf entry, and into links already sent
 			// out, so keep local state in step with what the server now serves.
+			// Persisting both halves matters: state alone loses the edit on
+			// reload, and every re-copied link would go back to the old path.
 			if (patch.slug !== undefined) {
-				const rows = entries.map((e) => (e.id === entry.id ? { ...e, slug: res.slug } : e));
-				entries = rows;
+				const next = updateShelfSlug(entry.id, res.slug);
+				entries = entries.map((e) => (e.id === entry.id && next ? next : e));
 			}
 			settingsEntry = null;
 			showToast('Link settings updated.', 'ok');
@@ -184,6 +205,7 @@
 	onMount(() => {
 		entries = getShelf();
 		folders = getFolders();
+		bundles = getBundles();
 		// Deep link from the reader's "Filed in" chip: /library?folder=<id>.
 		// Unknown ids fall through to All; the stale-folder $effect also guards.
 		const wanted = page.url.searchParams.get('folder');
@@ -218,6 +240,7 @@
 	function refresh() {
 		entries = getShelf();
 		folders = getFolders();
+		bundles = getBundles();
 	}
 
 	function showToast(message: string, kind: 'ok' | 'error' = 'ok') {
@@ -235,8 +258,123 @@
 		showToast(reason === 'missing' ? 'That doc is already gone.' : 'Delete failed. Try again.', 'error');
 	}
 
-	function openHref(e: ShelfEntry): string {
-		return `/s/${e.slug ?? e.id}`;
+	/**
+	 * The link as it was shared. The stored `url` wins so a re-copy hands back
+	 * the exact path the server minted; entries written before links were kept
+	 * fall back to deriving it, which is what the reader resolves anyway.
+	 */
+	function docPath(e: ShelfEntry): string {
+		return e.url ?? `/s/${e.slug ?? e.id}`;
+	}
+
+	function bundlePath(b: BundleEntry): string {
+		return b.url ?? `/b/${b.slug ?? b.id}`;
+	}
+
+	async function copyShareLink(path: string, rowId: string) {
+		if (await copyText(new URL(path, location.origin).href)) {
+			showToast('Link copied.', 'ok');
+			if (copiedTimer) clearTimeout(copiedTimer);
+			copiedId = rowId;
+			copiedTimer = setTimeout(() => (copiedId = null), 1600);
+		} else {
+			showToast('Could not copy the link.', 'error');
+		}
+	}
+
+	function copyDoc(e: ShelfEntry) {
+		copyShareLink(docPath(e), `doc:${e.id}`);
+	}
+
+	function copyBundle(b: BundleEntry) {
+		copyShareLink(bundlePath(b), `bundle:${b.id}`);
+	}
+
+	/**
+	 * A bundle stores the docs it froze, not the folder it came from, so the
+	 * folder is recovered by intersecting those ids with the live shelf. A
+	 * bundle whose folder is gone (or whose docs all moved out) would otherwise
+	 * have nowhere to live, so it lands in the uncategorised group rather than
+	 * disappearing.
+	 */
+	type BundleGroup = { folder: Folder | null; items: BundleEntry[] };
+
+	const bundleGroups = $derived.by((): BundleGroup[] => {
+		const docFolder = new Map<string, string>();
+		for (const e of entries) if (e.folder) docFolder.set(e.id, e.folder);
+		const known = new Set(folders.map((f) => f.id));
+
+		const grouped = new Map<string, BundleEntry[]>();
+		const orphans: BundleEntry[] = [];
+		for (const b of bundles) {
+			const owner = b.docIds.map((d) => docFolder.get(d)).find((f) => f && known.has(f));
+			if (owner) grouped.set(owner, [...(grouped.get(owner) ?? []), b]);
+			else orphans.push(b);
+		}
+
+		const groups: BundleGroup[] = folders
+			.filter((f) => grouped.has(f.id))
+			.map((f) => ({ folder: f, items: grouped.get(f.id) ?? [] }));
+		if (orphans.length) groups.push({ folder: null, items: orphans });
+		return groups;
+	});
+
+	/** Newest bundle for a folder — `getBundles` is newest first. */
+	function latestBundle(folderId: string): BundleEntry | null {
+		return bundleGroups.find((g) => g.folder?.id === folderId)?.items[0] ?? null;
+	}
+
+	/**
+	 * Local-only forget. The bundle keeps serving for anyone already holding
+	 * the link; only `deleteBundleRemote` would take it down for everyone, so
+	 * this deliberately does not reach the server.
+	 */
+	function forgetBundle(b: BundleEntry) {
+		removeBundle(b.id);
+		refresh();
+		showToast(`Forgot "${b.title}". The link still works for anyone who has it.`);
+	}
+
+	/* ------------------------------------------------- contributed docs */
+
+	// Owner-side view of docs other people added to a folder link. Only ever
+	// reachable with the bundle's own token, so a reader cannot enumerate them.
+	let contribBundle = $state<BundleEntry | null>(null);
+	let contributions = $state<Contribution[]>([]);
+	let contribLoading = $state(false);
+	let contribError = $state<string | null>(null);
+	let removingDocId = $state<string | null>(null);
+
+	async function openContributions(b: BundleEntry) {
+		contribBundle = b;
+		contributions = [];
+		contribError = null;
+		contribLoading = true;
+		const res = await listContributions(b.id, b.token);
+		contribLoading = false;
+		if (res.ok) contributions = res.value;
+		else contribError = res.error;
+	}
+
+	function closeContributions() {
+		if (removingDocId) return;
+		contribBundle = null;
+		contribError = null;
+	}
+
+	async function removeContributedDoc(c: Contribution) {
+		const b = contribBundle;
+		if (!b || removingDocId) return;
+		removingDocId = c.docId;
+		contribError = null;
+		const res = await removeContribution(b.id, c.docId, b.token);
+		removingDocId = null;
+		if (!res.ok) {
+			contribError = res.error;
+			return;
+		}
+		contributions = contributions.filter((x) => x.docId !== c.docId);
+		showToast(`Removed "${c.title}".`);
 	}
 
 	function timeAgo(ts: number): string {
@@ -307,13 +445,17 @@
 				password: optPassword.trim() || undefined,
 				expiresInSec: optExpiry === '0' ? null : Number.parseInt(optExpiry, 10),
 				maxViews: optMaxViewsValue,
-				slug: slugClean || null
+				slug: slugClean || null,
+				theme: optTheme || null
 			});
 			if (!res.ok) {
 				optError = res.error;
 				return;
 			}
 			optionsFolder = null;
+			// The new bundle is on the shelf now; surface its link so it can be
+			// copied again later without resharing the folder.
+			refresh();
 			const url = new URL(res.url, location.origin).href;
 			if (await copyText(url)) {
 				showToast(`Shared ${f.name}. Folder link copied.`, 'ok');
@@ -355,6 +497,14 @@
 		'rounded-sm border border-line bg-transparent px-2 py-1 text-[12px] text-ink-soft outline-none transition hover:border-iris hover:text-iris focus:border-iris dark:border-night-line dark:text-slate-400';
 	const navBtn =
 		'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] transition';
+	const rowBtn =
+		'shrink-0 rounded-sm border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]';
+	// Copy sits a step below Open/Options on the type scale, so the added
+	// control does not make the row any taller than it already was.
+	const copyBtn =
+		'shrink-0 rounded-sm border border-line px-2 py-1 text-xs font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]';
+	const railBtn =
+		'rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris dark:text-slate-500';
 </script>
 
 <svelte:head>
@@ -366,7 +516,7 @@
 	<h1 class="font-display text-2xl font-bold tracking-tight">Library</h1>
 	<p class="mt-1 text-sm text-ink-soft dark:text-slate-400">Docs you shared from this browser.</p>
 
-	{#if entries.length || folders.length}
+	{#if entries.length || folders.length || bundles.length}
 		<div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
 			<!-- folder rail -->
 			<nav class="w-full shrink-0 lg:sticky lg:top-6 lg:w-64" aria-label="Library folders">
@@ -408,8 +558,9 @@
 				{/if}
 
 				{#each folders as f (f.id)}
+					{@const folderBundle = latestBundle(f.id)}
 					<div
-						class="group flex items-center gap-1 {filter.kind === 'folder' && filter.id === f.id
+						class="group flex flex-wrap items-center gap-1 {filter.kind === 'folder' && filter.id === f.id
 							? 'bg-surface dark:bg-night-surface'
 							: ''} {dropTarget === f.id ? 'ring-1 ring-iris' : ''} rounded-sm"
 						ondragover={(e) => {
@@ -437,6 +588,9 @@
 								class="my-1 w-full min-w-0 rounded-sm border border-line bg-surface px-2 py-1 text-[13px] text-ink outline-none focus:border-iris dark:border-night-line dark:bg-night-surface dark:text-white"
 							/>
 						{:else}
+							<!-- The rail is 256px: four text actions do not fit beside a long folder
+							     name, so the row wraps them onto their own line rather than
+							     letting them spill over the doc list. -->
 							<button
 								type="button"
 								class="{navBtn} {filter.kind === 'folder' && filter.id === f.id
@@ -449,22 +603,32 @@
 								<span class="tabular-nums opacity-60">{counts.byFolder.get(f.id) ?? 0}</span>
 							</button>
 							<span class="hidden shrink-0 gap-0.5 group-hover:flex focus-within:flex lg:flex">
+								{#if folderBundle}
+									<button
+										type="button"
+										class={railBtn}
+										onclick={() => copyBundle(folderBundle)}
+										aria-label="Copy link for {f.name}">{copiedId === `bundle:${folderBundle.id}`
+											? 'Copied'
+											: 'Copy'}</button
+									>
+								{/if}
 								<button
 									type="button"
-									class="rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris dark:text-slate-500"
+									class={railBtn}
 									onclick={() => startRename(f)}
 									aria-label="Rename {f.name}">Rename</button
 								>
 								<button
 									type="button"
-									class="rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris disabled:opacity-40 dark:text-slate-500"
+									class="{railBtn} disabled:opacity-40"
 									onclick={() => openFolderOptions(f)}
 									disabled={sharingFolderId === f.id}
 									aria-label="Share {f.name} as one link">Share</button
 								>
 								<button
 									type="button"
-									class="rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris dark:text-slate-500"
+									class={railBtn}
 									onclick={() => removeFolder(f)}
 									aria-label="Delete {f.name}">Delete</button
 								>
@@ -513,7 +677,9 @@
 					>
 						{#each visible as entry (entry.id)}
 							<li
-								class="flex items-center gap-1 px-3.5 py-2.5 {dragId === entry.id ? 'opacity-40' : ''}"
+								class="flex flex-wrap items-center gap-1 px-3.5 py-2.5 sm:flex-nowrap {dragId === entry.id
+									? 'opacity-40'
+									: ''}"
 								draggable="true"
 								ondragstart={(e) => onDragStart(e, entry.id)}
 								ondragend={onDragEnd}
@@ -522,7 +688,7 @@
 									<span class="block truncate text-sm font-medium">{entry.title}</span>
 									<span
 										class="mt-0.5 block truncate font-mono text-[11px] text-ink-soft dark:text-slate-500"
-										>/s/{entry.slug ?? entry.id}{entry.createdAt ? ` · ${timeAgo(entry.createdAt)}` : ''}</span
+										>{docPath(entry)}{entry.createdAt ? ` · ${timeAgo(entry.createdAt)}` : ''}</span
 									>
 								</span>
 								<select
@@ -536,20 +702,29 @@
 										<option value={f.id}>{f.name}</option>
 									{/each}
 								</select>
-<a
-								href={openHref(entry)}
-								class="shrink-0 rounded-sm border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
-								>Open</a
-							>
-							<button
-								type="button"
-								onclick={() => openDocSettings(entry)}
-								class="shrink-0 rounded-sm border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
-								aria-label="Link settings for {entry.title}"
-							>
-								Options
-							</button>
-							<DeleteDocButton id={entry.id} title={entry.title} {onDeleted} {onDeleteFailed} />
+<!-- A title and this many controls cannot share a phone-width line, so the
+							     controls take their own row there rather than squeezing the title
+							     to nothing or letting the row scroll sideways. -->
+								<div class="flex w-full shrink-0 items-center gap-1 sm:w-auto">
+									<a href={docPath(entry)} class={rowBtn}>Open</a>
+									<button
+										type="button"
+										class={copyBtn}
+										onclick={() => copyDoc(entry)}
+										aria-label="Copy link for {entry.title}"
+									>
+										{copiedId === `doc:${entry.id}` ? 'Copied' : 'Copy'}
+									</button>
+									<button
+										type="button"
+										onclick={() => openDocSettings(entry)}
+										class={rowBtn}
+										aria-label="Link settings for {entry.title}"
+									>
+										Options
+									</button>
+									<DeleteDocButton id={entry.id} title={entry.title} {onDeleted} {onDeleteFailed} />
+								</div>
 							</li>
 						{/each}
 					</ul>
@@ -557,6 +732,65 @@
 					<p class="text-sm text-ink-soft dark:text-slate-400">
 						{filter.kind === 'folder' ? 'No docs in this folder yet.' : 'Nothing here yet.'}
 					</p>
+				{/if}
+
+				{#if bundleGroups.length}
+					<section class="mt-6" aria-labelledby="folder-links-heading">
+						<h2 id="folder-links-heading" class="font-display text-sm font-bold tracking-tight">
+							Folder links
+						</h2>
+						<p class="mt-1 text-[13px] text-ink-soft dark:text-slate-400">
+							Every folder link shared from this browser. Copy one instead of sharing the folder again —
+							forgetting one only drops it from this list, it keeps working for anyone who has it.
+						</p>
+
+						{#each bundleGroups as group (group.folder?.id ?? '__uncategorised__')}
+							<div class="mt-4">
+								<h3 class="text-xs font-semibold tracking-wide text-ink-soft uppercase dark:text-slate-500">
+									{group.folder?.name ?? 'Uncategorised'}
+								</h3>
+								<ul
+									class="mt-1.5 divide-y divide-line border border-line bg-surface dark:divide-night-line dark:border-night-line dark:bg-night-surface"
+								>
+									{#each group.items as b (b.id)}
+										<li class="flex items-center gap-1 px-3.5 py-2.5">
+											<span class="min-w-0 flex-1">
+												<span class="block truncate text-sm font-medium">{b.title}</span>
+												<span
+													class="mt-0.5 block truncate font-mono text-[11px] text-ink-soft dark:text-slate-500"
+													>{bundlePath(b)}{b.createdAt ? ` · ${timeAgo(b.createdAt)}` : ''}</span
+												>
+											</span>
+											<button
+												type="button"
+												class={copyBtn}
+												onclick={() => copyBundle(b)}
+												aria-label="Copy link for {b.title}"
+											>
+												{copiedId === `bundle:${b.id}` ? 'Copied' : 'Copy'}
+											</button>
+											<button
+												type="button"
+												class={rowBtn}
+												onclick={() => openContributions(b)}
+												aria-label="Manage contributed docs in {b.title}"
+											>
+												Added
+											</button>
+											<button
+												type="button"
+												class={rowBtn}
+												onclick={() => forgetBundle(b)}
+												aria-label="Forget the link for {b.title}"
+											>
+												Forget
+											</button>
+										</li>
+									{/each}
+								</ul>
+							</div>
+						{/each}
+					</section>
 				{/if}
 			</div>
 		</div>
@@ -675,6 +909,22 @@
 				{#if optMaxViewsError}
 					<p class="text-xs text-iris">{optMaxViewsError}</p>
 				{/if}
+
+				<label class="block">
+					<span class="mb-1.5 block text-sm font-medium">Theme</span>
+					<select
+						bind:value={optTheme}
+						class="w-full border border-line bg-paper px-2.5 py-2 text-sm focus:border-iris dark:border-night-line dark:bg-night"
+					>
+						<option value="">Reader's own</option>
+						{#each themes as t (t.id)}
+							<option value={t.id}>{t.label}</option>
+						{/each}
+					</select>
+					<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">
+						Pins a colourway on the folder page. Readers can still switch it for themselves.
+					</span>
+				</label>
 			</div>
 
 			{#if optError}
@@ -831,6 +1081,85 @@
 					class="btn-accent px-4 py-1.5 text-sm font-semibold transition disabled:opacity-50"
 				>
 					{sBusy ? 'Saving…' : 'Save settings'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if contribBundle}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="contrib-title"
+	>
+		<div class="fixed inset-0 bg-black/70 backdrop-blur-xs" onclick={closeContributions} aria-hidden="true"></div>
+
+		<div
+			class="rise relative z-10 w-full max-w-md border border-line bg-surface p-5 shadow-2xl dark:border-night-line dark:bg-night-surface"
+		>
+			<div class="flex items-start justify-between gap-4">
+				<h2 id="contrib-title" class="font-display text-[17px] font-bold tracking-tight text-ink">
+					Added to this folder
+				</h2>
+				<button
+					type="button"
+					onclick={closeContributions}
+					class="font-mono text-xs text-ink-soft transition hover:text-iris"
+					aria-label="Close contributed docs">Esc</button
+				>
+			</div>
+
+			<p class="mt-1.5 truncate text-[13px] text-ink-soft dark:text-slate-400">{contribBundle.title}</p>
+			<p class="mt-2 text-xs text-ink-soft dark:text-slate-500">
+				Docs other people added using the folder password. Removing one deletes it for everyone. Your own
+				docs are not listed here.
+			</p>
+
+			<div class="mt-4 min-h-[4rem]">
+				{#if contribLoading}
+					<p class="text-sm text-ink-soft dark:text-slate-400">Loading…</p>
+				{:else if contributions.length === 0}
+					<p class="text-sm text-ink-soft dark:text-slate-400">
+						Nobody has added anything to this folder yet.
+					</p>
+				{:else}
+					<ul class="divide-y divide-line border border-line dark:divide-night-line dark:border-night-line">
+						{#each contributions as c (c.docId)}
+							<li class="flex items-center gap-2 px-3 py-2.5">
+								<span class="min-w-0 flex-1">
+									<span class="block truncate text-sm font-medium">{c.title}</span>
+									<span class="mt-0.5 block truncate text-[11px] text-ink-soft dark:text-slate-500">
+										added by {c.contributorName}{c.createdAt ? ` · ${timeAgo(c.createdAt)}` : ''}
+									</span>
+								</span>
+								<button
+									type="button"
+									class="shrink-0 rounded-sm border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris disabled:opacity-40 dark:border-night-line"
+									disabled={removingDocId !== null}
+									onclick={() => removeContributedDoc(c)}
+									aria-label="Remove {c.title}"
+								>
+									{removingDocId === c.docId ? '…' : 'Remove'}
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+
+			{#if contribError}
+				<p class="mt-3 text-sm text-iris" role="alert">{contribError}</p>
+			{/if}
+
+			<div class="mt-5 flex items-center justify-end">
+				<button
+					type="button"
+					onclick={closeContributions}
+					class="rounded-sm border border-line px-3.5 py-1.5 text-sm text-ink-soft transition hover:text-ink dark:border-night-line"
+				>
+					Close
 				</button>
 			</div>
 		</div>

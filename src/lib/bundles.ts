@@ -18,6 +18,12 @@ export interface BundleEntry {
 	createdAt: number;
 	/** Doc ids frozen into this snapshot, for display only. */
 	docIds: string[];
+	/**
+	 * The path the server returned when it minted this link. Optional so bundles
+	 * recorded before links were stored still load; a missing one is derived
+	 * from `slug` exactly as the reader derives it.
+	 */
+	url?: string | null;
 }
 
 const STORAGE_KEY = 'sharemd-bundles';
@@ -30,6 +36,7 @@ interface LooseBundle {
 	token?: unknown;
 	createdAt?: unknown;
 	docIds?: unknown;
+	url?: unknown;
 }
 
 function normalize(v: unknown): BundleEntry | null {
@@ -44,7 +51,9 @@ function normalize(v: unknown): BundleEntry | null {
 		title: b.title,
 		token: b.token,
 		createdAt: typeof b.createdAt === 'number' ? b.createdAt : 0,
-		docIds: Array.isArray(b.docIds) ? b.docIds.filter((d): d is string => typeof d === 'string') : []
+		docIds: Array.isArray(b.docIds) ? b.docIds.filter((d): d is string => typeof d === 'string') : [],
+		// Null means "derive it from the slug", which is what a pre-url bundle needs.
+		url: typeof b.url === 'string' && b.url !== '' ? b.url : null
 	};
 }
 
@@ -109,6 +118,9 @@ export type BundleLinkOptions = {
 	expiresInSec?: number | null;
 	maxViews?: number | null;
 	slug?: string | null;
+	/** Creator's colourway for the folder page. Presentation only — a reader can
+	 *  still override it for their own session with `?theme=`. */
+	theme?: string | null;
 };
 
 /** Create a bundle from the docs currently filed in a folder. */
@@ -127,6 +139,7 @@ export async function createBundleForFolder(
 	if (options.maxViews) payload.maxViews = options.maxViews;
 	const slug = options.slug?.trim();
 	if (slug) payload.slug = slug;
+	if (options.theme) payload.theme = options.theme;
 
 	try {
 		const res = await fetch('/api/bundles', {
@@ -162,7 +175,10 @@ export async function createBundleForFolder(
 			title,
 			token: body.deleteToken,
 			createdAt: Date.now(),
-			docIds: docs.map((d) => d.docId)
+			docIds: docs.map((d) => d.docId),
+			// Keep the path the server resolved: re-copying has to hand back the
+			// same link that was just shared, not a re-derived guess at it.
+			url
 		});
 
 		return { ok: true, id: body.id, slug, url, deleteToken: body.deleteToken, docIds: docs.map((d) => d.docId) };
@@ -187,5 +203,70 @@ export async function deleteBundleRemote(id: string, token: string): Promise<Del
 		return 'failed';
 	} catch {
 		return 'failed';
+	}
+}
+
+/* ---------------------------------------------------------- contributions */
+
+export type Contribution = {
+	docId: string;
+	title: string;
+	contributorName: string;
+	createdAt: number;
+};
+
+export type ContributionResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+async function readError(res: Response, fallback: string): Promise<string> {
+	const out = (await res.json().catch(() => ({}))) as { error?: unknown };
+	return typeof out.error === 'string' ? out.error : fallback;
+}
+
+/**
+ * List what other people added to a folder you created.
+ *
+ * The bundle's own token authorises this, so it stays owner-only — a reader has
+ * no way to enumerate contributions beyond what the folder page already shows.
+ */
+export async function listContributions(
+	id: string,
+	token: string
+): Promise<ContributionResult<Contribution[]>> {
+	try {
+		const res = await fetch(`/api/bundles/${encodeURIComponent(id)}/members`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ token })
+		});
+		if (!res.ok) return { ok: false, error: await readError(res, 'Could not load contributions.') };
+		const out = (await res.json().catch(() => ({}))) as { contributions?: unknown };
+		return { ok: true, value: Array.isArray(out.contributions) ? (out.contributions as Contribution[]) : [] };
+	} catch {
+		return { ok: false, error: 'Could not reach the server. Check your connection.' };
+	}
+}
+
+/**
+ * Remove a doc somebody contributed to your folder. Only contributions are
+ * affected — your own docs stay in the Library where they belong.
+ */
+export async function removeContribution(
+	id: string,
+	docId: string,
+	token: string
+): Promise<ContributionResult<true>> {
+	try {
+		const res = await fetch(
+			`/api/bundles/${encodeURIComponent(id)}/members/${encodeURIComponent(docId)}`,
+			{
+				method: 'DELETE',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ token })
+			}
+		);
+		if (!res.ok) return { ok: false, error: await readError(res, 'Could not remove that.') };
+		return { ok: true, value: true };
+	} catch {
+		return { ok: false, error: 'Could not reach the server. Check your connection.' };
 	}
 }

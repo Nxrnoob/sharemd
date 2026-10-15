@@ -27,6 +27,14 @@ export interface ShelfEntry {
 	 * local metadata layered over the shelf, not a column on `documents`.
 	 */
 	folder?: string | null;
+	/**
+	 * The exact path the server handed back when this doc was shared.
+	 * Optional for the same reason as `folder`: entries written before links
+	 * were recorded have no `url`, and the reader falls back to deriving it
+	 * from `slug`. Storing it keeps a re-copied link byte-identical to the one
+	 * that was originally sent, even once a slug edit has moved the path.
+	 */
+	url?: string | null;
 }
 
 /** A user-created folder. Single-level by design — see docs in /library. */
@@ -49,6 +57,7 @@ interface LooseEntry {
 	token?: unknown;
 	createdAt?: unknown;
 	folder?: unknown;
+	url?: unknown;
 }
 
 function normalize(v: unknown): ShelfEntry | null {
@@ -63,7 +72,9 @@ function normalize(v: unknown): ShelfEntry | null {
 		token: e.token,
 		createdAt: typeof e.createdAt === 'number' && Number.isFinite(e.createdAt) ? e.createdAt : 0,
 		// Absent (pre-folders shelf) and garbage both land on null = uncategorised.
-		folder: typeof e.folder === 'string' && e.folder !== '' ? e.folder : null
+		folder: typeof e.folder === 'string' && e.folder !== '' ? e.folder : null,
+		// Null means "derive it", which is exactly what a pre-url shelf needs.
+		url: typeof e.url === 'string' && e.url !== '' ? e.url : null
 	};
 }
 
@@ -117,6 +128,22 @@ export function updateShelfTitle(id: string, newTitle: string): void {
 		target.title = newTitle;
 		save(entries);
 	}
+}
+
+/**
+ * Persist a new slug and the link that slug produced. Both halves have to move
+ * together: a caller that only fixes `slug` in memory re-copies the pre-edit URL
+ * after a reload, and links already sent keep pointing at whatever the server
+ * serves now — so the stored copy has to agree with it. Returns the rewritten
+ * entry, or null when the id is not on the shelf.
+ */
+export function updateShelfSlug(id: string, slug: string | null): ShelfEntry | null {
+	const entries = load();
+	const target = entries.find((e) => e.id === id);
+	if (!target) return null;
+	const next: ShelfEntry = { ...target, slug, url: `/s/${slug ?? target.id}` };
+	save(entries.map((e) => (e.id === id ? next : e)));
+	return next;
 }
 
 /** Record a share. Dedupes by id, newest first, capped at 100. */

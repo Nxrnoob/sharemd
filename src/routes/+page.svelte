@@ -502,6 +502,12 @@
 			}
 			// Silent shelf record: the delete token never appears in UI.
 			const deleteToken = typeof out.deleteToken === 'string' && out.deleteToken ? out.deleteToken : null;
+			// Resolve the theme before writing the shelf, so the stored url is the
+			// exact themed link the recipient gets. Without this a re-copied link
+			// silently loses the `?theme=` the user originally sent.
+			const savedTheme = typeof document !== 'undefined' ? document.documentElement.dataset.theme : null;
+			const shareTheme: ThemeId = isThemeId(savedTheme) ? savedTheme : DEFAULT_THEME_ID;
+			const sharedPath = typeof out.url === 'string' && out.url ? out.url : `/s/${out.id}`;
 			if (deleteToken) {
 				try {
 					addToShelf({
@@ -510,6 +516,7 @@
 						title: finalTitle.slice(0, 200),
 						token: deleteToken,
 						createdAt: Date.now(),
+						url: buildThemedUrl(sharedPath, shareTheme),
 						// File at share time. Validated against the live folder list so a
 						// folder deleted in another tab can't leave a dangling reference.
 						folder: folders.some((f) => f.id === shareFolderId) ? shareFolderId : null

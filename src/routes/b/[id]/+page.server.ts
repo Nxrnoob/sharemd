@@ -18,7 +18,10 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		id: bundle.id,
 		slug: bundle.slug,
 		title: bundle.title,
-		createdAt: bundle.createdAt
+		createdAt: bundle.createdAt,
+		// The creator's colourway for this folder. A presentation choice, not a
+		// gate — the reader can still override it for their own session.
+		theme: bundle.theme
 	};
 
 	const gate = gateBundle(bundle, null);
@@ -37,7 +40,9 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 			views: bundle.views,
 			gone: gate.status === 'gone',
 			goneReason: gate.status === 'gone' ? gate.reason : null,
-			passwordRequired: gate.status === 'locked'
+			passwordRequired: gate.status === 'locked',
+			// A locked folder is precisely the one nobody has unlocked yet.
+			canContribute: false
 		};
 	}
 
@@ -49,7 +54,8 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 			views: bundle.views + 1,
 			gone: true,
 			goneReason: 'exhausted' as const,
-			passwordRequired: false
+			passwordRequired: false,
+			canContribute: false
 		};
 	}
 
@@ -60,6 +66,10 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		views: bundle.views + 1,
 		gone: false,
 		goneReason: null,
-		passwordRequired: false
+		passwordRequired: false,
+		// Contributions are only open on a password-gated folder: that password
+		// is the whole authorisation, and an ungated folder would accept writes
+		// from anyone who ever opened the link.
+		canContribute: !!bundle.passwordHash
 	};
 };

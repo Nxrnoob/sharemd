@@ -10,6 +10,7 @@ import { cleanInput } from '$lib/server/markdown';
 import { hashPassword } from '$lib/server/password';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { EXPIRY_ALLOWLIST, SLUG_RE } from '$lib/server/link-gates';
+import { isThemeId } from '$lib/themes';
 
 const MAX_MEMBERS = 50;
 
@@ -32,13 +33,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		return json({ error: 'Invalid JSON' }, { status: 400 });
 	}
 
-	const { title, docs, slug, password, expiresInSec, maxViews } = body as {
+	const { title, docs, slug, password, expiresInSec, maxViews, theme } = body as {
 		title?: unknown;
 		docs?: unknown;
 		slug?: unknown;
 		password?: unknown;
 		expiresInSec?: unknown;
 		maxViews?: unknown;
+		theme?: unknown;
 	};
 
 	if (typeof title !== 'string' || !Array.isArray(docs)) {
@@ -145,6 +147,17 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		maxViewsVal = maxViews as number;
 	}
 
+	let themeVal: string | null = null;
+	if (theme !== undefined && theme !== null && theme !== '') {
+		// Validated against the shipped theme list rather than trusted, so a
+		// hand-rolled POST cannot pin the folder page to a colourway that does not
+		// exist and render it with unstyled fallbacks.
+		if (!isThemeId(theme)) {
+			return json({ error: 'unknown theme' }, { status: 400 });
+		}
+		themeVal = theme;
+	}
+
 	const id = nanoid(8);
 	// Capability token, identical discipline to documents: 32 random bytes,
 	// scrypt-hashed at rest, plaintext returned exactly once.
@@ -161,7 +174,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			passwordHash,
 			deleteTokenHash,
 			expiresAt,
-			maxViews: maxViewsVal
+			maxViews: maxViewsVal,
+			theme: themeVal
 		})
 		.run();
 
