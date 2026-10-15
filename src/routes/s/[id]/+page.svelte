@@ -384,10 +384,32 @@
 		unlockPending = true;
 		pwBusy = true;
 		try {
-			// Keep ?theme= (and anything else) while adding ?pw=.
+			// The password travels in a POST body and comes back as an HttpOnly
+			// grant cookie. It never enters the URL, so it cannot leak into the
+			// address bar, history, bookmarks or a Referer header.
+			const res = await fetch(`/api/docs/${data.id}/unlock`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ password: pwInput })
+			});
+			pwInput = '';
+			if (!res.ok) {
+				const out = (await res.json().catch(() => ({}))) as { error?: unknown };
+				pwError =
+					typeof out.error === 'string' ? out.error : 'Wrong password. Try again.';
+				unlockPending = false;
+				return;
+			}
+			// Re-run the load with the grant in place. Query params that belong to
+			// the link itself (?theme= and friends) are preserved; a legacy ?pw=
+			// is dropped rather than carried forward.
 			const params = new URLSearchParams(page.url.search);
-			params.set('pw', pwInput);
-			await goto(`${page.url.pathname}?${params.toString()}`, { invalidateAll: true });
+			params.delete('pw');
+			const query = params.toString();
+			await goto(`${page.url.pathname}${query ? `?${query}` : ''}`, { invalidateAll: true });
+		} catch {
+			pwError = 'Could not reach the server. Check your connection.';
+			unlockPending = false;
 		} finally {
 			pwBusy = false;
 		}

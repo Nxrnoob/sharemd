@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { gateBundle, getBundleMembers, resolveBundle, takeBundleView } from '$lib/server/bundles';
+import { grantCookieName, verifyGrant } from '$lib/server/grants';
 
 /**
  * The bundle index. Loads the membership list, not document content — every
@@ -9,7 +10,7 @@ import { gateBundle, getBundleMembers, resolveBundle, takeBundleView } from '$li
  * Gated states return NO members so a locked or expired bundle reveals nothing,
  * exactly as the document reader does.
  */
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, cookies }) => {
 	const bundle = await resolveBundle(params.id);
 	if (!bundle) throw error(404, 'Not found');
 
@@ -20,8 +21,16 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		createdAt: bundle.createdAt
 	};
 
-	const gate = gateBundle(bundle, url.searchParams.get('pw'));
-	if (!gate.ok) {
+	const gate = gateBundle(bundle, null);
+	// The folder password is never read from the URL; an unlock grant from the
+	// unlock endpoint stands in for it, exactly as on the document reader.
+	const granted =
+		!gate.ok &&
+		gate.status === 'locked' &&
+		!!bundle.passwordHash &&
+		verifyGrant(bundle.id, bundle.passwordHash, cookies.get(grantCookieName(bundle.id)));
+
+	if (!gate.ok && !granted) {
 		return {
 			...base,
 			members: [],

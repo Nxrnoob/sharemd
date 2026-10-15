@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { copyText } from '$lib/clipboard';
+	import { goto } from '$app/navigation';
 	import ThemePicker from '$lib/components/ThemePicker.svelte';
 	import HowItWorksModal from '$lib/components/HowItWorksModal.svelte';
 	import BackLink from '$lib/components/BackLink.svelte';
@@ -54,14 +55,34 @@
 		}
 	}
 
-	function unlock() {
+	async function unlock() {
 		if (!pwInput) {
 			gateError = 'Enter the password.';
 			return;
 		}
 		pwBusy = true;
 		gateError = null;
-		location.href = `/b/${data.slug ?? data.id}?pw=${encodeURIComponent(pwInput)}`;
+		try {
+			// POST body in, HttpOnly grant cookie out — the password never
+			// reaches the URL, unlike the `?pw=` this used to build.
+			const res = await fetch(`/api/bundles/${data.id}/unlock`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ password: pwInput })
+			});
+			pwInput = '';
+			if (!res.ok) {
+				const out = (await res.json().catch(() => ({}))) as { error?: unknown };
+				gateError =
+					typeof out.error === 'string' ? out.error : 'Wrong password. Try again.';
+				return;
+			}
+			await goto(bundleHref, { invalidateAll: true });
+		} catch {
+			gateError = 'Could not reach the server. Check your connection.';
+		} finally {
+			pwBusy = false;
+		}
 	}
 </script>
 

@@ -2,12 +2,13 @@ import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { gateDoc, isCrawlerBot, resolveDoc, takeView } from '$lib/server/docs';
 import { resolveDocLinks } from '$lib/server/doclinks';
+import { grantCookieName, verifyGrant } from '$lib/server/grants';
 
 // Loads pre-rendered HTML (no re-parse here).
 // renderMarkdown() runs only at POST time in src/lib/server/markdown.ts.
 // Gated states (gone / passwordRequired) return NO content (html '') but keep
 // the same shape so the reader UI can render its gate screens.
-export const load: PageServerLoad = async ({ params, url, request }) => {
+export const load: PageServerLoad = async ({ params, cookies, request }) => {
 	const row = await resolveDoc(params.id);
 	if (!row) throw error(404, 'Not found');
 
@@ -18,8 +19,18 @@ export const load: PageServerLoad = async ({ params, url, request }) => {
 		createdAt: row.createdAt
 	};
 
-	const gate = gateDoc(row, url.searchParams.get('pw'));
-	if (!gate.ok) {
+	const gate = gateDoc(row, null);
+	// An unlock grant stands in for the password: it proves one was already
+	// supplied without the password ever touching a URL. The password itself is
+	// deliberately not accepted from the query string, so a legacy `?pw=` link is
+	// ignored rather than quietly reintroducing the leak.
+	const granted =
+		!gate.ok &&
+		gate.status === 'locked' &&
+		!!row.passwordHash &&
+		verifyGrant(row.id, row.passwordHash, cookies.get(grantCookieName(row.id)));
+
+	if (!gate.ok && !granted) {
 		if (gate.status === 'gone') {
 			return {
 				...base,

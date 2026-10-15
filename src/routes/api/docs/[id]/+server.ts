@@ -3,17 +3,26 @@ import type { RequestHandler } from './$types';
 import { deleteDoc, gateDoc, isCrawlerBot, resolveDoc, takeView, updateDoc, verifyDeleteToken } from '$lib/server/docs';
 import { dropDocMemberships } from '$lib/server/bundles';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { grantCookieName, verifyGrant } from '$lib/server/grants';
 import { cleanInput, renderMarkdown, MAX_MARKDOWN_BYTES } from '$lib/server/markdown';
 
-export const GET: RequestHandler = async ({ params, url, request }) => {
+export const GET: RequestHandler = async ({ params, cookies, request }) => {
 	const { id } = params;
 	if (!id) return json({ error: 'Missing id' }, { status: 400 });
 
 	const row = await resolveDoc(id);
 	if (!row) return json({ error: 'Not found' }, { status: 404 });
 
-	const gate = gateDoc(row, url.searchParams.get('pw'));
-	if (!gate.ok) {
+	const gate = gateDoc(row, null);
+	// Same contract as the reader page: the password is never accepted from the
+	// query string, only an unlock grant cookie satisfies the lock.
+	const granted =
+		!gate.ok &&
+		gate.status === 'locked' &&
+		!!row.passwordHash &&
+		verifyGrant(row.id, row.passwordHash, cookies.get(grantCookieName(row.id)));
+
+	if (!gate.ok && !granted) {
 		if (gate.status === 'gone') return json({ gone: true }, { status: 410 });
 		return json({ passwordRequired: true }, { status: 403 });
 	}
