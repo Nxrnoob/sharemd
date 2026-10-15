@@ -43,6 +43,51 @@
 	/** folder id, '__none__' for the uncategorised drop target, null = idle */
 	let dropTarget = $state<string | null>(null);
 
+	// Folder link options. The same gates a doc link can carry, so a shared
+	// folder can be locked with a password and bounded like any other share.
+	let optionsFolder = $state<Folder | null>(null);
+	let optPassword = $state('');
+	let optExpiry = $state('0');
+	let optMaxViews: string | number | null = $state('');
+	/** Number inputs bind null when emptied, so normalise before touching .trim(). */
+	function str(v: unknown): string {
+		return typeof v === 'string' ? v : v == null ? '' : String(v);
+	}
+	let optSlug = $state('');
+	let optError = $state<string | null>(null);
+
+	const SLUG_RE = /^[a-z0-9-]{3,32}$/;
+	const slugClean = $derived(optSlug.trim());
+	const slugOk = $derived(slugClean === '' || SLUG_RE.test(slugClean));
+	const optPasswordError = $derived(
+		optPassword.trim() !== '' && optPassword.trim().length < 4 ? 'Min 4 characters.' : null
+	);
+	const optMaxViewsStr = $derived(str(optMaxViews).trim());
+	const optMaxViewsValue = $derived(
+		optMaxViewsStr === '' ? null : Number.parseInt(optMaxViewsStr, 10)
+	);
+	const optMaxViewsError = $derived(
+		optMaxViewsStr !== '' &&
+			(!Number.isInteger(optMaxViewsValue) || (optMaxViewsValue ?? 0) < 1)
+			? 'Must be 1 or more.'
+			: null
+	);
+
+	function openFolderOptions(f: Folder) {
+		optionsFolder = f;
+		optPassword = '';
+		optExpiry = '0';
+		optMaxViews = '';
+		optSlug = '';
+		optError = null;
+	}
+
+	function closeFolderOptions() {
+		if (sharingFolderId) return;
+		optionsFolder = null;
+		optError = null;
+	}
+
 	onMount(() => {
 		entries = getShelf();
 		folders = getFolders();
@@ -157,19 +202,33 @@
 	 */
 	async function shareFolder(f: Folder) {
 		if (sharingFolderId) return;
+		if (optPasswordError || optMaxViewsError || !slugOk) {
+			optError = 'Fix the highlighted field.';
+			return;
+		}
+		optionsFolder = f;
 		sharingFolderId = f.id;
+		optError = null;
 		try {
-			const res = await createBundleForFolder(f.id, f.name);
+			const res = await createBundleForFolder(f.id, f.name, {
+				password: optPassword.trim() || undefined,
+				expiresInSec: optExpiry === '0' ? null : Number.parseInt(optExpiry, 10),
+				maxViews: optMaxViewsValue,
+				slug: slugClean || null
+			});
 			if (!res.ok) {
-				showToast(res.error, 'error');
+				optError = res.error;
 				return;
 			}
+			optionsFolder = null;
 			const url = new URL(res.url, location.origin).href;
 			if (await copyText(url)) {
 				showToast(`Shared ${f.name}. Folder link copied.`, 'ok');
 			} else {
 				showToast(`Shared ${f.name}. Copy the link: ${res.url}`, 'ok');
 			}
+		} catch {
+			optError = 'Could not reach the server. Check your connection.';
 		} finally {
 			sharingFolderId = null;
 		}
@@ -306,7 +365,7 @@
 								<button
 									type="button"
 									class="rounded-sm px-1.5 py-1 text-[11px] text-ink-soft transition hover:text-iris disabled:opacity-40 dark:text-slate-500"
-									onclick={() => shareFolder(f)}
+									onclick={() => openFolderOptions(f)}
 									disabled={sharingFolderId === f.id}
 									aria-label="Share {f.name} as one link">Share</button
 								>
@@ -412,3 +471,132 @@
 </main>
 
 <Toast message={toast?.message ?? null} kind={toast?.kind ?? 'ok'} />
+
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === 'Escape' && optionsFolder) closeFolderOptions();
+	}}
+/>
+
+{#if optionsFolder}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="folder-options-title"
+	>
+		<div
+			class="fixed inset-0 bg-black/70 backdrop-blur-xs"
+			onclick={closeFolderOptions}
+			aria-hidden="true"
+		></div>
+
+		<div
+			class="rise relative z-10 w-full max-w-md border border-line bg-surface p-5 shadow-2xl dark:border-night-line dark:bg-night-surface"
+		>
+			<div class="flex items-start justify-between gap-4">
+				<h2 id="folder-options-title" class="font-display text-[17px] font-bold tracking-tight text-ink">
+					Share “{optionsFolder.name}”
+				</h2>
+				<button
+					type="button"
+					onclick={closeFolderOptions}
+					class="font-mono text-xs text-ink-soft transition hover:text-iris"
+					aria-label="Close folder link options">Esc</button
+				>
+			</div>
+
+			<p class="mt-1.5 text-[13px] text-ink-soft dark:text-slate-400">
+				One link to every doc in this folder. Leave everything blank for a plain share.
+			</p>
+
+			<div class="mt-4 space-y-3.5">
+				<label class="block">
+					<span class="mb-1.5 block text-sm font-medium">Custom slug</span>
+					<input
+						bind:value={optSlug}
+						maxlength="32"
+						placeholder="my-folder"
+						autocomplete="off"
+						spellcheck="false"
+						class="w-full border bg-paper px-3 py-2 font-mono text-[13px] placeholder:text-ink-soft/50 focus:border-iris dark:bg-night dark:placeholder:text-slate-600 {slugOk
+							? 'border-line dark:border-night-line'
+							: 'border-iris'}"
+					/>
+					<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">
+						a-z, 0-9 and dashes, 3 to 32 long.
+					</span>
+				</label>
+
+				<label class="block">
+					<span class="mb-1.5 block text-sm font-medium">Password</span>
+					<input
+						type="password"
+						bind:value={optPassword}
+						placeholder="Optional"
+						autocomplete="new-password"
+						class="w-full border bg-paper px-3 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:bg-night dark:placeholder:text-slate-600 {optPasswordError
+							? 'border-iris'
+							: 'border-line dark:border-night-line'}"
+					/>
+					<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">
+						{optPasswordError ?? 'Min 4 characters. Readers type this once to open the folder.'}
+					</span>
+				</label>
+
+				<div class="grid grid-cols-2 gap-3">
+					<label class="block">
+						<span class="mb-1.5 block text-sm font-medium">Expires</span>
+						<select
+							bind:value={optExpiry}
+							class="w-full border border-line bg-paper px-2.5 py-2 text-sm focus:border-iris dark:border-night-line dark:bg-night"
+						>
+							<option value="0">Never</option>
+							<option value="3600">1 hour</option>
+							<option value="86400">1 day</option>
+							<option value="604800">7 days</option>
+							<option value="2592000">30 days</option>
+						</select>
+					</label>
+					<label class="block">
+						<span class="mb-1.5 block text-sm font-medium">Max views</span>
+						<input
+							type="number"
+							min="1"
+							bind:value={optMaxViews}
+							placeholder="No limit"
+							class="w-full border bg-paper px-2.5 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris dark:bg-night dark:placeholder:text-slate-600 {optMaxViewsError
+								? 'border-iris'
+								: 'border-line dark:border-night-line'}"
+						/>
+					</label>
+				</div>
+				{#if optMaxViewsError}
+					<p class="text-xs text-iris">{optMaxViewsError}</p>
+				{/if}
+			</div>
+
+			{#if optError}
+				<p class="mt-3 text-sm text-iris">{optError}</p>
+			{/if}
+
+			<div class="mt-5 flex items-center justify-end gap-2">
+				<button
+					type="button"
+					onclick={closeFolderOptions}
+					class="rounded-sm border border-line px-3.5 py-1.5 text-sm text-ink-soft transition hover:text-ink dark:border-night-line"
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					onclick={() => optionsFolder && shareFolder(optionsFolder)}
+					disabled={sharingFolderId !== null}
+					class="btn-accent px-4 py-1.5 text-sm font-semibold transition disabled:opacity-50"
+				>
+					{sharingFolderId === optionsFolder.id ? 'Sharing…' : 'Share folder'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}

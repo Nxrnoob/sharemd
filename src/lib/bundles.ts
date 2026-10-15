@@ -100,19 +100,39 @@ export type CreateBundleResult =
 	| { ok: true; id: string; slug: string | null; url: string; deleteToken: string; docIds: string[] }
 	| { ok: false; error: string };
 
+/**
+ * Optional gates for a folder share. Every key is omitted from the request when
+ * unset, so sharing with no options sends exactly the body it always did.
+ */
+export type BundleLinkOptions = {
+	password?: string;
+	expiresInSec?: number | null;
+	maxViews?: number | null;
+	slug?: string | null;
+};
+
 /** Create a bundle from the docs currently filed in a folder. */
 export async function createBundleForFolder(
 	folderId: string,
-	title: string
+	title: string,
+	options: BundleLinkOptions = {}
 ): Promise<CreateBundleResult> {
 	const docs = folderMembers(folderId);
 	if (docs.length === 0) return { ok: false, error: 'That folder has no docs to share.' };
+
+	const payload: Record<string, unknown> = { title, docs };
+	const password = options.password?.trim();
+	if (password) payload.password = password;
+	if (options.expiresInSec) payload.expiresInSec = options.expiresInSec;
+	if (options.maxViews) payload.maxViews = options.maxViews;
+	const slug = options.slug?.trim();
+	if (slug) payload.slug = slug;
 
 	try {
 		const res = await fetch('/api/bundles', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ title, docs })
+			body: JSON.stringify(payload)
 		});
 		const out = (await res.json().catch(() => ({}))) as unknown;
 		const body =
