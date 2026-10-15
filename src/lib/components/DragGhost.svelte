@@ -26,6 +26,21 @@
 	 */
 	const PAD = 10;
 
+	/**
+	 * Painted margins of the supplied artwork at `SIZE`, in px, stroke included.
+	 *
+	 * Measured from the art rather than assumed. In the 500-unit viewBox the ink
+	 * spans x 62..421.4 and y 72.6..490, and `strokeWidth` adds half its width on
+	 * every side. Horizontally that comes out close to even (10.6 / 13.8), so a
+	 * single box gap reads fine. Vertically it is badly uneven — 12.6px of blank
+	 * space above the head against 0.6px below the chin — so a fixed box gap
+	 * would read as a 12px jump the moment the cat flipped from trailing below
+	 * the file to leading above it. `GAP_ABOVE` buys that back.
+	 */
+	const INK_TOP = 12.6;
+	const INK_BOTTOM = 0.6;
+	const GAP_ABOVE = GAP + (INK_TOP - INK_BOTTOM);
+
 	interface Props {
 		/** True while the pointer is over the page's actual drop zone. */
 		overTarget?: boolean;
@@ -60,7 +75,7 @@
 		if (left + SIZE + PAD > vw) left = x - GAP - SIZE;
 
 		let top = y + GAP;
-		if (top + SIZE + PAD > vh) top = y - GAP - SIZE;
+		if (top + SIZE + PAD > vh) top = y - GAP_ABOVE - SIZE;
 
 		left = Math.min(Math.max(left, PAD), Math.max(PAD, vw - SIZE - PAD));
 		top = Math.min(Math.max(top, PAD), Math.max(PAD, vh - SIZE - PAD));
