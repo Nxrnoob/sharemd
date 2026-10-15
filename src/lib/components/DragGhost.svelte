@@ -20,6 +20,16 @@
 	/** Gap between the pointer and the cat's nearest edge. */
 	const GAP = 32;
 	/**
+	 * Wider gap for the cat's preferred side, down-right of the pointer.
+	 *
+	 * The cursor's own file preview is drawn by the operating system, above page
+	 * content, and it sits bottom-right of the pointer — so at the normal gap the
+	 * cat was hidden behind it rather than beside it. On the left side the cat is
+	 * horizontal to the preview and never overlapped, which is why that side
+	 * keeps the tighter gap.
+	 */
+	const GAP_RIGHT = 64;
+	/**
 	 * Breathing room kept between the cat and the viewport edge. Comfortably
 	 * covers the 10% over-target scale (96 -> 105.6), which grows the painted
 	 * box by ~4.8px per side while the layout box stays at SIZE.
@@ -71,7 +81,7 @@
 	const placement = $derived.by(() => {
 		if (vw === 0 || vh === 0) return { left: PAD, top: PAD, flipped: false };
 
-		let left = x + GAP;
+		let left = x + GAP_RIGHT;
 		if (left + SIZE + PAD > vw) left = x - GAP - SIZE;
 
 		let top = y + GAP;
