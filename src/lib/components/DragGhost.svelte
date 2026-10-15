@@ -154,7 +154,13 @@
 {/if}
 
 <style>
-	.drag-ghost-flip {
-		transition: scale 0.18s ease-out;
-	}
+	/*
+	 * Deliberately no transition on the mirror.
+	 *
+	 * Animating `scale` from `-1 1` to `1 1` sweeps the value through zero, which
+	 * collapses the cat to nothing and then re-inflates it — measured live at 6.7px
+	 * wide mid-switch, against a settled 96px. During that squash the cat looks
+	 * miles from the file, which reads as the spacing jumping about every time it
+	 * changes sides. A mirror is a discrete state, so it snaps.
+	 */
 </style>
