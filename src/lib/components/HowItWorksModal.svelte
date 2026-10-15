@@ -84,9 +84,23 @@
 					</div>
 
 					<div class="border-l-2 border-line pl-3.5 dark:border-night-line">
-						<h3 class="font-medium text-ink">4. Edit or delete anytime</h3>
+						<h3 class="font-medium text-ink">4. Group docs into folders</h3>
 						<p class="mt-0.5">
-							Since there are no logins, docs you share from this browser are saved to your Library up in the top bar. You can edit your docs in place or delete them whenever you need to.
+							Folders live in your Library. Related docs go in one place, so a long project stays tidy instead of becoming one flat list of links you have to rummage through later.
+						</p>
+					</div>
+
+					<div class="border-l-2 border-line pl-3.5 dark:border-night-line">
+						<h3 class="font-medium text-ink">5. Share a whole folder at once</h3>
+						<p class="mt-0.5">
+							Hit Share next to any folder and you get a single link to the whole bundle. Recipients open it and land on a reading list of every doc inside. Unsharing a bundle later leaves your docs exactly where they were.
+						</p>
+					</div>
+
+					<div class="border-l-2 border-line pl-3.5 dark:border-night-line">
+						<h3 class="font-medium text-ink">6. Pick up where you left off</h3>
+						<p class="mt-0.5">
+							Everything you share from this browser is kept in your Library, so you can edit or delete it any time. Recently viewed sits at the top for quick return trips, and reader and folder pages carry a Back button that takes you home the way you came.
 						</p>
 					</div>
 				</div>
@@ -99,6 +113,10 @@
 						<li><span class="text-ink">Esc</span>: close popups and dialogs</li>
 					</ul>
 				</div>
+
+				<p class="border-l-2 border-iris pl-3.5 text-[13px]">
+					One last thing. The cat that follows your cursor while you drag a file in wakes up whenever this guide is open, and it gets loose until you close it. Old DVD screensaver, give or take.
+				</p>
 			</div>
 
 			<!-- footer -->

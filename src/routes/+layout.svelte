@@ -4,6 +4,7 @@
 	import './layout.css';
 	import ThemePicker from '$lib/components/ThemePicker.svelte';
 	import HowItWorksModal from '$lib/components/HowItWorksModal.svelte';
+	import CatScreensaver from '$lib/components/CatScreensaver.svelte';
 
 	let showGuide = $state(false);
 
@@ -104,5 +105,7 @@
 		</div>
 	</footer>
 	<HowItWorksModal bind:open={showGuide} />
+	<!-- Easter egg: the cat only breaks free while the guide is open. -->
+	<CatScreensaver active={showGuide} />
 </div>
 
