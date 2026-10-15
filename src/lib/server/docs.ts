@@ -57,18 +57,36 @@ export async function deleteDoc(docId: string): Promise<boolean> {
 	return res.rowsAffected > 0;
 }
 
-/** Update a doc's title, markdown, and rendered HTML by id. Returns true when updated. */
+/** Optional link gates. A key left undefined is not touched, so callers can
+ *  change the expiry without restating the password and vice versa. `password`
+ *  is the odd one out: pass '' to clear an existing lock. */
+export type DocGateUpdate = {
+	slug?: string | null;
+	passwordHash?: string | null;
+	expiresAt?: number | null;
+	maxViews?: number | null;
+};
+
+/**
+ * Update a doc's title, markdown and rendered HTML by id. Returns true when updated.
+ * `gates` is applied in the same statement so title/markdown edits and link-settings
+ * changes never need two round trips.
+ */
 export async function updateDoc(
 	docId: string,
 	title: string,
 	rawMarkdown: string,
-	html: string
+	html: string,
+	gates?: DocGateUpdate
 ): Promise<boolean> {
-	const res = await db
-		.update(documents)
-		.set({ title, rawMarkdown, html })
-		.where(eq(documents.id, docId))
-		.run();
+	const set: Partial<Document> = { title, rawMarkdown, html };
+	if (gates) {
+		if (gates.slug !== undefined) set.slug = gates.slug;
+		if (gates.passwordHash !== undefined) set.passwordHash = gates.passwordHash;
+		if (gates.expiresAt !== undefined) set.expiresAt = gates.expiresAt;
+		if (gates.maxViews !== undefined) set.maxViews = gates.maxViews;
+	}
+	const res = await db.update(documents).set(set).where(eq(documents.id, docId)).run();
 	return res.rowsAffected > 0;
 }
 

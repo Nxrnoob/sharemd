@@ -9,9 +9,8 @@ import { findGatedMember, verifyMemberOwnership } from '$lib/server/bundles';
 import { cleanInput } from '$lib/server/markdown';
 import { hashPassword } from '$lib/server/password';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { EXPIRY_ALLOWLIST, SLUG_RE } from '$lib/server/link-gates';
 
-const SLUG_RE = /^[a-z0-9-]{3,32}$/;
-const EXPIRY_ALLOWLIST = [3600, 86400, 604800, 2592000];
 const MAX_MEMBERS = 50;
 
 interface MemberInput {

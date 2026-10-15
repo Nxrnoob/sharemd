@@ -153,6 +153,51 @@ export async function deleteOwnedDoc(id: string, token: string): Promise<DeleteR
 	}
 }
 
+/* --------------------------------------------------------- doc link settings */
+
+/**
+ * Link-gate changes for a doc that is already shared. Deliberately mirrors the
+ * server's patch semantics: an omitted key leaves that gate untouched, while an
+ * explicit empty/null value clears it. That distinction is what lets the dialog
+ * offer "leave alone" and "remove" as separate choices without the client having
+ * to know the doc's current state — the shelf stores no gate information.
+ */
+export type DocSettingsPatch = {
+	/** undefined leaves the lock alone; '' removes it. */
+	password?: string;
+	/** undefined leaves it alone; null removes it. */
+	expiresInSec?: number | null;
+	maxViews?: number | null;
+	slug?: string | null;
+};
+
+export type UpdateSettingsResult = { ok: true; slug: string | null } | { ok: false; error: string };
+
+export async function updateDocLinkSettings(
+	id: string,
+	token: string,
+	patch: DocSettingsPatch
+): Promise<UpdateSettingsResult> {
+	try {
+		const res = await fetch(`/api/docs/${encodeURIComponent(id)}`, {
+			method: 'PUT',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ token, ...patch })
+		});
+		const out = (await res.json().catch(() => ({}))) as { slug?: unknown; error?: unknown };
+		if (!res.ok) {
+			return {
+				ok: false,
+				error:
+					typeof out.error === 'string' ? out.error : 'Could not update those settings.'
+			};
+		}
+		return { ok: true, slug: typeof out.slug === 'string' && out.slug ? out.slug : null };
+	} catch {
+		return { ok: false, error: 'Could not reach the server. Check your connection.' };
+	}
+}
+
 /* ---------------------------------------------------------------- folders */
 
 /**

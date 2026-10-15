@@ -10,6 +10,7 @@
 		renameFolder,
 		deleteFolder,
 		setDocFolder,
+		updateDocLinkSettings,
 		type ShelfEntry,
 		type Folder
 	} from '$lib/shelf';
@@ -86,6 +87,98 @@
 		if (sharingFolderId) return;
 		optionsFolder = null;
 		optError = null;
+	}
+
+	// Editable link settings for a doc that is already shared. The shelf stores no
+	// gate information, so the dialog never claims to show current values — every
+	// control is explicitly "leave alone" or "change this", and removing a gate is
+	// its own control rather than an empty box.
+	let settingsEntry = $state<ShelfEntry | null>(null);
+	let sSlug = $state('');
+	let sPassword = $state('');
+	let sRemovePassword = $state(false);
+	let sExpiry = $state('keep');
+	let sMaxViews: string | number | null = $state('');
+	let sNoLimit = $state(false);
+	let sError = $state<string | null>(null);
+	let sBusy = $state(false);
+
+	const sSlugOk = $derived(sSlug === '' || SLUG_RE.test(sSlug));
+	const sPasswordError = $derived(
+		!sRemovePassword && sPassword.trim() !== '' && sPassword.trim().length < 4
+			? 'Min 4 characters.'
+			: null
+	);
+	const sMaxViewsStr = $derived(str(sMaxViews).trim());
+	const sMaxViewsError = $derived(
+		!sNoLimit &&
+			sMaxViewsStr !== '' &&
+			(!Number.isInteger(Number.parseInt(sMaxViewsStr, 10)) ||
+				Number.parseInt(sMaxViewsStr, 10) < 1)
+			? 'Must be 1 or more.'
+			: null
+	);
+
+	function openDocSettings(entry: ShelfEntry) {
+		settingsEntry = entry;
+		sSlug = entry.slug ?? '';
+		sPassword = '';
+		sRemovePassword = false;
+		sExpiry = 'keep';
+		sMaxViews = '';
+		sNoLimit = false;
+		sError = null;
+	}
+
+	function closeDocSettings() {
+		if (sBusy) return;
+		settingsEntry = null;
+		sError = null;
+	}
+
+	async function saveDocSettings() {
+		const entry = settingsEntry;
+		if (!entry || sBusy) return;
+		if (!sSlugOk || sPasswordError || sMaxViewsError) {
+			sError = 'Fix the highlighted field.';
+			return;
+		}
+
+		// Only send keys the user actually chose to change, so an untouched field
+		// cannot silently wipe a gate that is already set.
+		const patch: Parameters<typeof updateDocLinkSettings>[2] = {};
+		if (sSlug !== (entry.slug ?? '')) patch.slug = sSlug || null;
+		if (sRemovePassword) patch.password = '';
+		else if (sPassword.trim()) patch.password = sPassword.trim();
+		if (sExpiry === '0') patch.expiresInSec = null;
+		else if (sExpiry !== 'keep') patch.expiresInSec = Number.parseInt(sExpiry, 10);
+		if (sNoLimit) patch.maxViews = null;
+		else if (sMaxViewsStr !== '') patch.maxViews = Number.parseInt(sMaxViewsStr, 10);
+
+		if (Object.keys(patch).length === 0) {
+			settingsEntry = null;
+			return;
+		}
+
+		sBusy = true;
+		sError = null;
+		try {
+			const res = await updateDocLinkSettings(entry.id, entry.token, patch);
+			if (!res.ok) {
+				sError = res.error;
+				return;
+			}
+			// The slug is baked into the shelf entry, and into links already sent
+			// out, so keep local state in step with what the server now serves.
+			if (patch.slug !== undefined) {
+				const rows = entries.map((e) => (e.id === entry.id ? { ...e, slug: res.slug } : e));
+				entries = rows;
+			}
+			settingsEntry = null;
+			showToast('Link settings updated.', 'ok');
+		} finally {
+			sBusy = false;
+		}
 	}
 
 	onMount(() => {
@@ -443,12 +536,20 @@
 										<option value={f.id}>{f.name}</option>
 									{/each}
 								</select>
-								<a
-									href={openHref(entry)}
-									class="shrink-0 rounded-sm border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
-									>Open</a
-								>
-								<DeleteDocButton id={entry.id} title={entry.title} {onDeleted} {onDeleteFailed} />
+<a
+								href={openHref(entry)}
+								class="shrink-0 rounded-sm border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
+								>Open</a
+							>
+							<button
+								type="button"
+								onclick={() => openDocSettings(entry)}
+								class="shrink-0 rounded-sm border border-line px-3 py-1 text-[13px] font-medium text-ink-soft transition hover:border-iris hover:text-iris active:scale-[0.98]"
+								aria-label="Link settings for {entry.title}"
+							>
+								Options
+							</button>
+							<DeleteDocButton id={entry.id} title={entry.title} {onDeleted} {onDeleteFailed} />
 							</li>
 						{/each}
 					</ul>
@@ -595,6 +696,141 @@
 					class="btn-accent px-4 py-1.5 text-sm font-semibold transition disabled:opacity-50"
 				>
 					{sharingFolderId === optionsFolder.id ? 'Sharing…' : 'Share folder'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if settingsEntry}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="doc-settings-title"
+	>
+		<div class="fixed inset-0 bg-black/70 backdrop-blur-xs" onclick={closeDocSettings} aria-hidden="true"></div>
+
+		<div
+			class="rise relative z-10 w-full max-w-md border border-line bg-surface p-5 shadow-2xl dark:border-night-line dark:bg-night-surface"
+		>
+			<div class="flex items-start justify-between gap-4">
+				<h2 id="doc-settings-title" class="font-display text-[17px] font-bold tracking-tight text-ink">
+					Link settings
+				</h2>
+				<button
+					type="button"
+					onclick={closeDocSettings}
+					class="font-mono text-xs text-ink-soft transition hover:text-iris"
+					aria-label="Close link settings">Esc</button
+				>
+			</div>
+
+			<p class="mt-1.5 truncate text-[13px] text-ink-soft dark:text-slate-400">
+				{settingsEntry.title}
+			</p>
+			<p class="mt-2 text-xs text-ink-soft dark:text-slate-500">
+				Anything you leave alone stays as it is.
+			</p>
+
+			<div class="mt-4 space-y-3.5">
+				<label class="block">
+					<span class="mb-1.5 block text-sm font-medium">Custom slug</span>
+					<input
+						bind:value={sSlug}
+						maxlength="32"
+						placeholder="my-doc-name"
+						autocomplete="off"
+						spellcheck="false"
+						class="w-full border bg-paper px-3 py-2 font-mono text-[13px] placeholder:text-ink-soft/50 focus:border-iris dark:bg-night dark:placeholder:text-slate-600 {sSlugOk
+							? 'border-line dark:border-night-line'
+							: 'border-iris'}"
+					/>
+					<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">
+						{sSlugOk ? 'a-z, 0-9 and dashes, 3 to 32 long. Clear it to go back to the id link.' : 'Letters, numbers and dashes only.'}
+					</span>
+				</label>
+
+				<label class="block">
+					<span class="mb-1.5 block text-sm font-medium">Password</span>
+					<input
+						type="password"
+						bind:value={sPassword}
+						disabled={sRemovePassword}
+						placeholder="Leave blank to keep it as it is"
+						autocomplete="new-password"
+						class="w-full border bg-paper px-3 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris disabled:opacity-50 dark:bg-night dark:placeholder:text-slate-600 {sPasswordError
+							? 'border-iris'
+							: 'border-line dark:border-night-line'}"
+					/>
+					<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">
+						{sPasswordError ?? 'Set a new one, or leave blank to keep whatever is there.'}
+					</span>
+				</label>
+
+				<label class="flex items-center gap-2 text-sm">
+					<input type="checkbox" bind:checked={sRemovePassword} class="accent-iris" />
+					<span class="text-ink-soft dark:text-slate-400">Remove the password from this link</span>
+				</label>
+
+				<div class="grid grid-cols-2 gap-3">
+					<label class="block">
+						<span class="mb-1.5 block text-sm font-medium">Expires</span>
+						<select
+							bind:value={sExpiry}
+							class="w-full border border-line bg-paper px-2.5 py-2 text-sm focus:border-iris dark:border-night-line dark:bg-night"
+						>
+							<option value="keep">Leave unchanged</option>
+							<option value="0">Never</option>
+							<option value="3600">1 hour</option>
+							<option value="86400">1 day</option>
+							<option value="604800">7 days</option>
+							<option value="2592000">30 days</option>
+						</select>
+					</label>
+					<label class="block">
+						<span class="mb-1.5 block text-sm font-medium">Max views</span>
+						<input
+							type="number"
+							min="1"
+							step="1"
+							bind:value={sMaxViews}
+							disabled={sNoLimit}
+							placeholder="Leave blank"
+							class="w-full border bg-paper px-2.5 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris disabled:opacity-50 dark:bg-night dark:placeholder:text-slate-600 {sMaxViewsError
+								? 'border-iris'
+								: 'border-line dark:border-night-line'}"
+						/>
+					</label>
+				</div>
+				<label class="flex items-center gap-2 text-sm">
+					<input type="checkbox" bind:checked={sNoLimit} class="accent-iris" />
+					<span class="text-ink-soft dark:text-slate-400">No view limit</span>
+				</label>
+				{#if sMaxViewsError}
+					<p class="text-xs text-iris">{sMaxViewsError}</p>
+				{/if}
+			</div>
+
+			{#if sError}
+				<p class="mt-3 text-sm text-iris">{sError}</p>
+			{/if}
+
+			<div class="mt-5 flex items-center justify-end gap-2">
+				<button
+					type="button"
+					onclick={closeDocSettings}
+					class="rounded-sm border border-line px-3.5 py-1.5 text-sm text-ink-soft transition hover:text-ink dark:border-night-line"
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					onclick={saveDocSettings}
+					disabled={sBusy}
+					class="btn-accent px-4 py-1.5 text-sm font-semibold transition disabled:opacity-50"
+				>
+					{sBusy ? 'Saving…' : 'Save settings'}
 				</button>
 			</div>
 		</div>

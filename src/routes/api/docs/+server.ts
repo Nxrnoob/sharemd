@@ -8,9 +8,8 @@ import { documents } from '$lib/server/db/schema';
 import { MAX_MARKDOWN_BYTES, cleanInput, renderMarkdown } from '$lib/server/markdown';
 import { hashPassword } from '$lib/server/password';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { EXPIRY_ALLOWLIST, SLUG_RE } from '$lib/server/link-gates';
 
-const SLUG_RE = /^[a-z0-9-]{3,32}$/;
-const EXPIRY_ALLOWLIST = [3600, 86400, 604800, 2592000];
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
