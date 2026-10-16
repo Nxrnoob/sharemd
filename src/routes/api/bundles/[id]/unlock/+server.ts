@@ -12,7 +12,7 @@ import { grantCookieName, grantValue } from '$lib/server/grants';
  */
 export const POST: RequestHandler = async ({ params, request, cookies, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = await checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip, 'unlock');
 	if (!allowed) {
 		return json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
 	}

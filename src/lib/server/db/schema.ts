@@ -96,4 +96,18 @@ export const bundleItems = sqliteTable(
 	]
 );
 
+
+/**
+ * Uploaded image assets. Stored in the database so images survive
+ * serverless function lifecycles and read-only container runtimes (such as Vercel).
+ */
+export const uploads = sqliteTable('uploads', {
+	filename: text('filename').primaryKey(),
+	contentType: text('content_type').notNull(),
+	dataBase64: text('data_base64').notNull(),
+	createdAt: integer('created_at').notNull()
+});
+
+export type Upload = typeof uploads.$inferSelect;
+export type NewUpload = typeof uploads.$inferInsert;
 export type BundleItem = typeof bundleItems.$inferSelect;

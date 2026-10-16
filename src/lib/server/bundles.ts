@@ -5,7 +5,9 @@ import { db } from './db';
 import { bundleItems, bundles, documents, type Bundle } from './db/schema';
 import { deleteDoc, gateDoc, resolveDoc, type Gate } from './docs';
 import { hashPassword, verifyPassword } from './password';
+import { grantCookieName, verifyGrant } from './grants';
 
+export type { Bundle };
 export type BundleGate = Gate;
 
 /** Resolve by slug first, then by id — same shadowing rule as `resolveDoc`. */
@@ -46,6 +48,60 @@ export async function takeBundleView(bundleId: string): Promise<boolean> {
 export function verifyBundleToken(bundle: Bundle, token: string): boolean {
 	if (!bundle.deleteTokenHash) return false;
 	return verifyPassword(token, bundle.deleteTokenHash);
+}
+
+/**
+ * Find all bundles that contain this document.
+ */
+export async function getDocBundles(docId: string): Promise<Bundle[]> {
+	const rows = await db
+		.select({
+			id: bundles.id,
+			title: bundles.title,
+			slug: bundles.slug,
+			createdAt: bundles.createdAt,
+			views: bundles.views,
+			passwordHash: bundles.passwordHash,
+			deleteTokenHash: bundles.deleteTokenHash,
+			expiresAt: bundles.expiresAt,
+			maxViews: bundles.maxViews,
+			theme: bundles.theme
+		})
+		.from(bundles)
+		.innerJoin(bundleItems, eq(bundleItems.bundleId, bundles.id))
+		.where(eq(bundleItems.docId, docId))
+		.all();
+	return rows;
+}
+
+/**
+ * Check if a document is gated via its parent bundles.
+ * If the doc has no password of its own, but belongs to one or more
+ * password-protected bundles, access requires a grant for at least one of those bundles.
+ */
+export async function resolveDocBundleGate(
+	docId: string,
+	hasDocPassword: boolean,
+	getCookie: (name: string) => string | undefined
+): Promise<{ locked: boolean; protectedBundles: Bundle[] }> {
+	if (hasDocPassword) {
+		return { locked: false, protectedBundles: [] };
+	}
+
+	const parentBundles = await getDocBundles(docId);
+	const protectedBundles = parentBundles.filter((b) => !!b.passwordHash);
+
+	if (protectedBundles.length === 0) {
+		return { locked: false, protectedBundles: [] };
+	}
+
+	for (const b of protectedBundles) {
+		if (b.passwordHash && verifyGrant(b.id, b.passwordHash, getCookie(grantCookieName(b.id)))) {
+			return { locked: false, protectedBundles };
+		}
+	}
+
+	return { locked: true, protectedBundles };
 }
 
 export interface BundleMember {
@@ -269,7 +325,7 @@ export async function contributeDoc(
 			docId,
 			// Appended, so the creator's frozen ordering is never disturbed.
 			position: (stats?.maxPos ?? -1) + 1,
-			contributorName
+			contributorName: contributorName?.trim() || 'Anonymous'
 		})
 		.run();
 

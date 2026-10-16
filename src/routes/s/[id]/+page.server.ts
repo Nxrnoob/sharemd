@@ -3,6 +3,7 @@ import { error } from '@sveltejs/kit';
 import { gateDoc, isCrawlerBot, resolveDoc, takeView } from '$lib/server/docs';
 import { resolveDocLinks } from '$lib/server/doclinks';
 import { grantCookieName, verifyGrant } from '$lib/server/grants';
+import { resolveDocBundleGate } from '$lib/server/bundles';
 
 // Loads pre-rendered HTML (no re-parse here).
 // renderMarkdown() runs only at POST time in src/lib/server/markdown.ts.
@@ -30,10 +31,20 @@ export const load: PageServerLoad = async ({ params, cookies, request }) => {
 		!!row.passwordHash &&
 		verifyGrant(row.id, row.passwordHash, cookies.get(grantCookieName(row.id)));
 
-	if (!gate.ok && !granted) {
-		if (gate.status === 'gone') {
+	const bundleGate = await resolveDocBundleGate(
+		row.id,
+		Boolean(row.passwordHash),
+		(name) => cookies.get(name)
+	);
+
+	const isLocked = (!gate.ok && gate.status === 'locked' && !granted) || bundleGate.locked;
+	const isGone = !gate.ok && gate.status === 'gone';
+
+	if (isGone || isLocked) {
+		if (isGone) {
 			return {
 				...base,
+				title: 'Unavailable doc',
 				html: '',
 				rawMarkdown: '',
 				views: row.views,
@@ -46,6 +57,7 @@ export const load: PageServerLoad = async ({ params, cookies, request }) => {
 		}
 		return {
 			...base,
+			title: 'Locked doc',
 			html: '',
 			rawMarkdown: '',
 			views: row.views,

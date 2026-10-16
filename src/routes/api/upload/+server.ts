@@ -7,8 +7,7 @@ const ALLOWED_TYPES: Record<string, true> = {
 	'image/png': true,
 	'image/jpeg': true,
 	'image/webp': true,
-	'image/gif': true,
-	'image/svg+xml': true
+	'image/gif': true
 };
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
@@ -32,7 +31,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 
 	if (!ALLOWED_TYPES[file.type.toLowerCase()]) {
 		return json(
-			{ error: 'Only PNG, JPEG, WebP, GIF, and SVG images are supported.' },
+			{ error: 'Only PNG, JPEG, WebP, and GIF images are supported.' },
 			{ status: 400 }
 		);
 	}
@@ -44,10 +43,11 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	try {
 		const arrayBuffer = await file.arrayBuffer();
 		const buffer = Buffer.from(arrayBuffer);
-		const { filename, url } = saveUpload(buffer, file.type);
+		const { filename, url } = await saveUpload(buffer, file.type);
 
 		return json({ filename, url }, { status: 201 });
 	} catch (err) {
+		console.error('Failed to save image:', err);
 		return json({ error: 'Failed to save image' }, { status: 500 });
 	}
 };

@@ -10,9 +10,9 @@ import { checkRateLimit } from '$lib/server/rate-limit';
  */
 export const DELETE: RequestHandler = async ({ params, request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = await checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip, 'edit');
 	if (!allowed) {
-		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
+		return json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
 	}
 
 	const { id } = params;

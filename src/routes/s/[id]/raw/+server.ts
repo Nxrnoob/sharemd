@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
-import { gateDoc, resolveDoc } from '$lib/server/docs';
+import { gateDoc, resolveDoc, takeView } from '$lib/server/docs';
 import { grantCookieName, verifyGrant } from '$lib/server/grants';
+import { resolveDocBundleGate } from '$lib/server/bundles';
 
 function toDownloadFilename(title: string | null | undefined, fallback: string): string {
 	const slug = (title || '')
@@ -29,9 +30,22 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 		!!row.passwordHash &&
 		verifyGrant(row.id, row.passwordHash, cookies.get(grantCookieName(row.id)));
 
-	if (!gate.ok && !granted) {
-		if (gate.status === 'gone') return new Response('Gone', { status: 410 });
+	const bundleGate = await resolveDocBundleGate(
+		row.id,
+		Boolean(row.passwordHash),
+		(name) => cookies.get(name)
+	);
+
+	const isLocked = (!gate.ok && gate.status === 'locked' && !granted) || bundleGate.locked;
+	const isGone = !gate.ok && gate.status === 'gone';
+
+	if (isGone || isLocked) {
+		if (isGone) return new Response('Gone', { status: 410 });
 		return new Response('Password required', { status: 403 });
+	}
+
+	if (!(await takeView(row.id))) {
+		return new Response('Gone', { status: 410 });
 	}
 
 	const filename = toDownloadFilename(row.title || row.slug, row.id);

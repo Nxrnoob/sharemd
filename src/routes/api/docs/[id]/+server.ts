@@ -11,7 +11,7 @@ import {
 	verifyDeleteToken,
 	type DocGateUpdate
 } from '$lib/server/docs';
-import { dropDocMemberships } from '$lib/server/bundles';
+import { dropDocMemberships, getDocBundles, resolveBundle, resolveDocBundleGate } from '$lib/server/bundles';
 import { checkRateLimit } from '$lib/server/rate-limit';
 import { grantCookieName, verifyGrant } from '$lib/server/grants';
 import { hashPassword } from '$lib/server/password';
@@ -36,8 +36,17 @@ export const GET: RequestHandler = async ({ params, cookies, request }) => {
 		!!row.passwordHash &&
 		verifyGrant(row.id, row.passwordHash, cookies.get(grantCookieName(row.id)));
 
-	if (!gate.ok && !granted) {
-		if (gate.status === 'gone') return json({ gone: true }, { status: 410 });
+	const bundleGate = await resolveDocBundleGate(
+		row.id,
+		Boolean(row.passwordHash),
+		(name) => cookies.get(name)
+	);
+
+	const isLocked = (!gate.ok && gate.status === 'locked' && !granted) || bundleGate.locked;
+	const isGone = !gate.ok && gate.status === 'gone';
+
+	if (isGone || isLocked) {
+		if (isGone) return json({ gone: true }, { status: 410 });
 		return json({ passwordRequired: true }, { status: 403 });
 	}
 
@@ -59,9 +68,9 @@ export const GET: RequestHandler = async ({ params, cookies, request }) => {
 
 export const DELETE: RequestHandler = async ({ params, request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = await checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip, 'edit');
 	if (!allowed) {
-		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
+		return json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
 	}
 
 	const { id } = params;
@@ -92,9 +101,9 @@ export const DELETE: RequestHandler = async ({ params, request, getClientAddress
 
 export const PUT: RequestHandler = async ({ params, request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = await checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip, 'edit');
 	if (!allowed) {
-		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
+		return json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
 	}
 
 	const { id } = params;
@@ -179,13 +188,38 @@ export const PUT: RequestHandler = async ({ params, request, getClientAddress })
 		} else if (typeof slug !== 'string' || !SLUG_RE.test(slug)) {
 			return json({ error: 'slug must match ^[a-z0-9-]{3,32}$' }, { status: 400 });
 		} else {
+			const RESERVED_SLUGS: Record<string, true> = {
+				library: true, api: true, b: true, s: true, raw: true,
+				new: true, edit: true, static: true, admin: true,
+				help: true, upload: true, u: true
+			};
+			if (RESERVED_SLUGS[slug.toLowerCase()]) {
+				return json({ error: 'slug is a reserved keyword' }, { status: 400 });
+			}
 			const clash = await db
 				.select({ id: documents.id })
 				.from(documents)
 				.where(or(eq(documents.slug, slug), eq(documents.id, slug)))
 				.get();
 			if (clash && clash.id !== row.id) return json({ error: 'slug taken' }, { status: 409 });
+			const bundleClash = await resolveBundle(slug);
+			if (bundleClash) return json({ error: 'slug taken' }, { status: 409 });
 			gates.slug = slug;
+		}
+	}
+
+	const isAddingGates =
+		(gates.passwordHash !== undefined && gates.passwordHash !== null) ||
+		(gates.expiresAt !== undefined && gates.expiresAt !== null) ||
+		(gates.maxViews !== undefined && gates.maxViews !== null);
+
+	if (isAddingGates) {
+		const parentBundles = await getDocBundles(row.id);
+		if (parentBundles.length > 0) {
+			return json(
+				{ error: 'This doc is in a shared folder. Remove it from the folder before adding gates to it.' },
+				{ status: 400 }
+			);
 		}
 	}
 

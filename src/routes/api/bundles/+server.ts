@@ -21,9 +21,9 @@ interface MemberInput {
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = await checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip, 'create');
 	if (!allowed) {
-		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
+		return json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
 	}
 
 	let body: unknown;
@@ -103,8 +103,16 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		if (typeof slug !== 'string' || !SLUG_RE.test(slug)) {
 			return json({ error: 'slug must match ^[a-z0-9-]{3,32}$' }, { status: 400 });
 		}
+		const RESERVED_SLUGS: Record<string, true> = {
+			library: true, api: true, b: true, s: true, raw: true,
+			new: true, edit: true, static: true, admin: true,
+			help: true, upload: true, u: true
+		};
+		if (RESERVED_SLUGS[slug.toLowerCase()]) {
+			return json({ error: 'slug is a reserved keyword' }, { status: 400 });
+		}
 		// /b/ and /s/ are separate namespaces, so a clash would not break
-		// resolution — but two different things answering to one word is a trap
+		// resolution, but two different things answering to one word is a trap
 		// for humans, so refuse across both tables.
 		const docClash = await db
 			.select({ id: documents.id })

@@ -23,9 +23,9 @@ const MAX_CONTRIBUTOR_NAME = 60;
  */
 export const POST: RequestHandler = async ({ params, request, cookies, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = await checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip, 'contribute');
 	if (!allowed) {
-		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
+		return json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
 	}
 
 	const bundle = await resolveBundle(params.id);
@@ -72,13 +72,14 @@ export const POST: RequestHandler = async ({ params, request, cookies, getClient
 
 	// Optional and free-form: this is a courtesy label, never an identity claim,
 	// and it grants nothing. Trimmed and capped rather than validated.
-	const contributorName =
+	const rawName =
 		typeof contributor === 'string' ? cleanInput(contributor).trim().slice(0, MAX_CONTRIBUTOR_NAME) : '';
+	const contributorName = rawName || 'Anonymous';
 
 	const cleanMd = cleanInput(markdown);
 	const html = await renderMarkdown(cleanMd);
 
-	const res = await contributeDoc(bundle.id, cleanTitle, cleanMd, html, contributorName || null);
+	const res = await contributeDoc(bundle.id, cleanTitle, cleanMd, html, contributorName);
 	if (!res.ok) {
 		return json({ error: 'This folder is full.' }, { status: 409 });
 	}

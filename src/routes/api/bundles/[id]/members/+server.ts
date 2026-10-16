@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { listContributedMembers, resolveBundle, verifyBundleToken } from '$lib/server/bundles';
+import { checkRateLimit } from '$lib/server/rate-limit';
 
 /**
  * List what other people added to a folder you created.
@@ -13,10 +14,15 @@ import { listContributedMembers, resolveBundle, verifyBundleToken } from '$lib/s
  * reason the reader's password does not: a URL gets copied, bookmarked and sent
  * in Referer headers.
  */
-export const POST: RequestHandler = async ({ params, request }) => {
+export const POST: RequestHandler = async ({ params, request, getClientAddress }) => {
+	const ip = getClientAddress?.() ?? 'unknown';
+	const { allowed } = await checkRateLimit(ip, 'manage');
+	if (!allowed) {
+		return json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
+	}
+
 	const { id } = params;
 	if (!id) return json({ error: 'Missing id' }, { status: 400 });
-
 	let body: unknown;
 	try {
 		body = await request.json();

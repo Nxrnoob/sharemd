@@ -206,13 +206,29 @@ const SANITIZE_OPTIONS: SanitizeOptions = {
 	// SVG viewBox and MathML tags are case-sensitive; keep them intact.
 	parser: { lowerCaseTags: false, lowerCaseAttributeNames: false },
 	allowedSchemes: ['http', 'https', 'mailto'],
+	allowProtocolRelative: false,
+	allowedStyles: {
+		'*': {
+			color: [/^[#a-zA-Z0-9(),.\s-]+$/],
+			'background-color': [/^[#a-zA-Z0-9(),.\s-]+$/],
+			'text-align': [/^(left|right|center|justify)$/],
+			'font-size': [/^[0-9]+(?:\.[0-9]+)?(?:px|em|rem|%)$/],
+			'font-weight': [/^(normal|bold|[1-9]00)$/],
+			'font-style': [/^(normal|italic|oblique)$/],
+			'text-decoration': [/^[a-zA-Z\s-]+$/],
+			'vertical-align': [/^[a-zA-Z0-9\s.-]+$/],
+			width: [/^[0-9]+(?:\.[0-9]+)?(?:px|em|rem|%|auto)$/],
+			height: [/^[0-9]+(?:\.[0-9]+)?(?:px|em|rem|%|auto)$/],
+			display: [/^(inline|inline-block|block|inline-flex|flex)$/]
+		}
+	},
 	// was the afterSanitizeElements hook: drop every input except checkboxes
 	exclusiveFilter: (frame) => frame.tag === 'input' && frame.attribs.type !== 'checkbox',
 	// was the afterSanitizeAttributes hook: external links open safely
 	transformTags: {
 		a: (tagName, attribs) => {
 			const href = attribs.href || '';
-			if (href.startsWith('http://') || href.startsWith('https://')) {
+			if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
 				return { tagName, attribs: { ...attribs, target: '_blank', rel: 'noopener noreferrer' } };
 			}
 			return { tagName, attribs };

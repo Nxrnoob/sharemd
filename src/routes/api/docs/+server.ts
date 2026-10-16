@@ -8,14 +8,15 @@ import { documents } from '$lib/server/db/schema';
 import { MAX_MARKDOWN_BYTES, cleanInput, renderMarkdown } from '$lib/server/markdown';
 import { hashPassword } from '$lib/server/password';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { resolveBundle } from '$lib/server/bundles';
 import { EXPIRY_ALLOWLIST, SLUG_RE } from '$lib/server/link-gates';
 
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const ip = getClientAddress?.() ?? 'unknown';
-	const { allowed } = await checkRateLimit(ip);
+	const { allowed } = await checkRateLimit(ip, 'create');
 	if (!allowed) {
-		return json({ error: 'Rate limit exceeded (20/hr)' }, { status: 429 });
+		return json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
 	}
 
 	let body: unknown;
@@ -51,6 +52,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		if (typeof slug !== 'string' || !SLUG_RE.test(slug)) {
 			return json({ error: 'slug must match ^[a-z0-9-]{3,32}$' }, { status: 400 });
 		}
+		const RESERVED_SLUGS: Record<string, true> = {
+			library: true, api: true, b: true, s: true, raw: true,
+			new: true, edit: true, static: true, admin: true,
+			help: true, upload: true, u: true
+		};
+		if (RESERVED_SLUGS[slug.toLowerCase()]) {
+			return json({ error: 'slug is a reserved keyword' }, { status: 400 });
+		}
 		// Slugs must not shadow an existing id either (resolution is slug-first).
 		const clash = await db
 			.select({ id: documents.id })
@@ -58,6 +67,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			.where(or(eq(documents.slug, slug), eq(documents.id, slug)))
 			.get();
 		if (clash) return json({ error: 'slug taken' }, { status: 409 });
+		const bundleClash = await resolveBundle(slug);
+		if (bundleClash) return json({ error: 'slug taken' }, { status: 409 });
 		slugVal = slug;
 	}
 
