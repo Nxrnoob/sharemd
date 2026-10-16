@@ -55,10 +55,7 @@
 	let pwInput = $state('');
 	let pwBusy = $state(false);
 	let pwError = $state<string | null>(null);
-	let unlockTried = $state(false);
-	// True between submit and the refreshed load data landing. The error is
-	// only ever set from the *latest* completed attempt, never the flight.
-	let unlockPending = $state(false);
+	let pwStatus = $state('');
 	let isOwner = $state(false);
 	let editing = $state(false);
 	let editTitle = $state('');
@@ -103,9 +100,7 @@
 		if (isGone || isGated) return;
 		noteViewed('doc', data.id, data.slug, data.title ?? 'Untitled');
 	});
-	const gateError = $derived(
-		pwError ?? (unlockTried && isGated ? 'Wrong password. Try again.' : null)
-	);
+	const gateError = $derived(pwError);
 
 	const themedPath = $derived(buildThemedUrl(`/s/${data.id}`, screenTheme));
 	const themedRawPath = $derived(buildThemedUrl(`/s/${data.id}/raw`, screenTheme));
@@ -376,13 +371,12 @@
 	}
 	async function unlock() {
 		pwError = null;
-		unlockTried = false;
 		if (!pwInput.trim()) {
 			pwError = 'Type the password first.';
 			return;
 		}
-		unlockPending = true;
 		pwBusy = true;
+		pwStatus = 'Bribing the gatekeeper...';
 		try {
 			// The password travels in a POST body and comes back as an HttpOnly
 			// grant cookie. It never enters the URL, so it cannot leak into the
@@ -396,10 +390,12 @@
 			if (!res.ok) {
 				const out = (await res.json().catch(() => ({}))) as { error?: unknown };
 				pwError =
-					typeof out.error === 'string' ? out.error : 'Wrong password. Try again.';
-				unlockPending = false;
+					typeof out.error === 'string' ? out.error : 'Wrong password. The gatekeeper is unimpressed.';
+				pwBusy = false;
+				pwStatus = '';
 				return;
 			}
+			pwStatus = 'Access granted! Decrypting document...';
 			// Re-run the load with the grant in place. Query params that belong to
 			// the link itself (?theme= and friends) are preserved; a legacy ?pw=
 			// is dropped rather than carried forward.
@@ -409,22 +405,10 @@
 			await goto(`${page.url.pathname}${query ? `?${query}` : ''}`, { invalidateAll: true });
 		} catch {
 			pwError = 'Could not reach the server. Check your connection.';
-			unlockPending = false;
-		} finally {
 			pwBusy = false;
+			pwStatus = '';
 		}
 	}
-
-	// Resolve the pending attempt once fresh load data arrives: a still-gated
-	// doc means the latest attempt failed; an unlocked doc clears silently,
-	// so a correct password never flashes the error on its way in.
-	$effect(() => {
-		void data;
-		if (!unlockPending) return;
-		unlockPending = false;
-		if (isGated) unlockTried = true;
-	});
-
 	onMount(() => {
 		isOwner = owns(data.id);
 		const handleScroll = () => {
@@ -596,8 +580,6 @@
 						bind:value={pwInput}
 						oninput={() => {
 							pwError = null;
-							unlockTried = false;
-							unlockPending = false;
 						}}
 						placeholder="Link password"
 						autocomplete="off"
@@ -610,11 +592,11 @@
 				<button
 					type="submit"
 					disabled={pwBusy}
-					class="btn-accent mt-4 inline-flex w-full items-center justify-center px-6 py-2.5 text-[15px] font-semibold transition"
+					class="btn-accent mt-4 inline-flex w-full items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold transition"
 				>
 					{#if pwBusy}
-						<span class="size-4 animate-spin border-2 border-current border-t-transparent opacity-60" aria-hidden="true"></span>
-						Unlocking…
+						<span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent opacity-80" aria-hidden="true"></span>
+						<span>{pwStatus || 'Unlocking...'}</span>
 					{:else}
 						Unlock
 					{/if}

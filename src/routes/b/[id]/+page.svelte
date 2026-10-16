@@ -40,6 +40,7 @@
 
 	let pwInput = $state('');
 	let pwBusy = $state(false);
+	let pwStatus = $state('');
 	let gateError = $state<string | null>(null);
 	let copied = $state(false);
 	// Theme actually on screen (link override, folder colourway, or viewer
@@ -200,9 +201,10 @@
 			return;
 		}
 		pwBusy = true;
+		pwStatus = 'Bribing the gatekeeper...';
 		gateError = null;
 		try {
-			// POST body in, HttpOnly grant cookie out — the password never
+			// POST body in, HttpOnly grant cookie out, the password never
 			// reaches the URL, unlike the `?pw=` this used to build.
 			const res = await fetch(`/api/bundles/${data.id}/unlock`, {
 				method: 'POST',
@@ -213,9 +215,12 @@
 			if (!res.ok) {
 				const out = (await res.json().catch(() => ({}))) as { error?: unknown };
 				gateError =
-					typeof out.error === 'string' ? out.error : 'Wrong password. Try again.';
+					typeof out.error === 'string' ? out.error : 'Wrong password. The gatekeeper is unimpressed.';
+				pwBusy = false;
+				pwStatus = '';
 				return;
 			}
+			pwStatus = 'Access granted! Opening folder...';
 			// Re-run the load with the grant in place. Query params that belong to
 			// the link itself (?theme= and friends) are preserved; a legacy ?pw=
 			// is dropped rather than carried forward.
@@ -225,8 +230,8 @@
 			await goto(`${page.url.pathname}${query ? `?${query}` : ''}`, { invalidateAll: true });
 		} catch {
 			gateError = 'Could not reach the server. Check your connection.';
-		} finally {
 			pwBusy = false;
+			pwStatus = '';
 		}
 	}
 
@@ -446,9 +451,14 @@ const out = (await res.json().catch(() => ({}))) as {
 				<button
 					type="submit"
 					disabled={pwBusy}
-					class="btn-accent mt-4 inline-flex w-full items-center justify-center px-6 py-2.5 text-[15px] font-semibold transition"
+					class="btn-accent mt-4 inline-flex w-full items-center justify-center gap-2 px-6 py-2.5 text-[15px] font-semibold transition"
 				>
-					Unlock
+					{#if pwBusy}
+						<span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent opacity-80" aria-hidden="true"></span>
+						<span>{pwStatus || 'Unlocking...'}</span>
+					{:else}
+						Unlock
+					{/if}
 				</button>
 			</form>
 		</div>
