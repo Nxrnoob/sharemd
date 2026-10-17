@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import DragGhost from '$lib/components/DragGhost.svelte';
@@ -133,17 +134,39 @@
 		shelfDocs = items;
 		shelfIds = new Set(items.map((e) => e.id));
 		folders = getFolders();
+		const folderParam = page.url.searchParams.get('folder');
+		if (folderParam && folders.some((f) => f.id === folderParam)) {
+			shareFolderId = folderParam;
+		}
+
 		try {
-			const saved = localStorage.getItem(DRAFT_KEY);
-			if (saved) {
-				const parsed = JSON.parse(saved) as { title?: unknown; markdown?: unknown };
-				if (typeof parsed.markdown === 'string' && parsed.markdown.trim()) {
+			const pending = sessionStorage.getItem('sharemd-pending-drop');
+			if (pending) {
+				sessionStorage.removeItem('sharemd-pending-drop');
+				const parsed = JSON.parse(pending) as { title?: unknown; markdown?: unknown; folder?: unknown };
+				if (typeof parsed.markdown === 'string') {
 					markdown = parsed.markdown;
 					if (typeof parsed.title === 'string' && parsed.title.trim()) {
 						title = parsed.title;
 						titleTouched = true;
 					}
-					showToast('Draft restored from your last visit.');
+					if (typeof parsed.folder === 'string' && folders.some((f) => f.id === parsed.folder)) {
+						shareFolderId = parsed.folder;
+					}
+					showToast('Imported file into editor.');
+				}
+			} else {
+				const saved = localStorage.getItem(DRAFT_KEY);
+				if (saved) {
+					const parsed = JSON.parse(saved) as { title?: unknown; markdown?: unknown };
+					if (typeof parsed.markdown === 'string' && parsed.markdown.trim()) {
+						markdown = parsed.markdown;
+						if (typeof parsed.title === 'string' && parsed.title.trim()) {
+							title = parsed.title;
+							titleTouched = true;
+						}
+						showToast('Draft restored from your last visit.');
+					}
 				}
 			}
 		} catch {}

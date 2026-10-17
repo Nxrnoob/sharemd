@@ -8,6 +8,7 @@
 	import BackToTop from '$lib/components/BackToTop.svelte';
 	import DocTile from '$lib/components/DocTile.svelte';
 	import PaneHeader from '$lib/components/PaneHeader.svelte';
+	import FileGlyph from '$lib/components/FileGlyph.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { RULE, SUBTLE } from '$lib/components/fileSkin';
 	import { noteViewed } from '$lib/recent';
@@ -60,7 +61,127 @@
 	// above the fold on a long folder. Both ends keep focus on the tile.
 	let addTileEl = $state<HTMLElement | null>(null);
 	let addTitleEl = $state<HTMLInputElement | null>(null);
+	let titleTouched = $state(false);
+	let textareaEl = $state<HTMLTextAreaElement | null>(null);
+	let fileInputEl = $state<HTMLInputElement | null>(null);
+	let dropActive = $state(false);
 
+	const MAX_BYTES = 512 * 1024;
+	const byteLength = $derived(new TextEncoder().encode(addMarkdown).length);
+	const percent = $derived(Math.min(100, Math.round((byteLength / MAX_BYTES) * 100)));
+	const kbLabel = $derived((byteLength / 1024).toFixed(1) + ' KB');
+
+	const DRAFT_KEY = (id: string) => `sharemd-contrib-draft-${id}`;
+	let draftTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function saveContribDraft() {
+		if (typeof localStorage === 'undefined') return;
+		if (draftTimer) clearTimeout(draftTimer);
+		draftTimer = setTimeout(() => {
+			if (!addTitle.trim() && !addMarkdown.trim()) {
+				try {
+					localStorage.removeItem(DRAFT_KEY(data.id));
+				} catch {}
+			} else {
+				try {
+					localStorage.setItem(
+						DRAFT_KEY(data.id),
+						JSON.stringify({ title: addTitle, markdown: addMarkdown })
+					);
+				} catch {}
+			}
+		}, 300);
+	}
+
+	function restoreContribDraft() {
+		if (typeof localStorage === 'undefined') return;
+		try {
+			const saved = localStorage.getItem(DRAFT_KEY(data.id));
+			if (saved) {
+				const parsed = JSON.parse(saved) as { title?: unknown; markdown?: unknown };
+				if (typeof parsed.markdown === 'string') addMarkdown = parsed.markdown;
+				if (typeof parsed.title === 'string' && parsed.title.trim()) {
+					addTitle = parsed.title;
+					titleTouched = true;
+				}
+			}
+		} catch {}
+	}
+
+	function onMarkdownInput() {
+		addError = null;
+		addOk = null;
+		if (!titleTouched && !addTitle.trim()) {
+			const match = addMarkdown.match(/^#\s+(.+)$/m);
+			if (match) {
+				addTitle = match[1].trim();
+			}
+		}
+		saveContribDraft();
+	}
+
+	function onTextareaKeydown(e: KeyboardEvent) {
+		if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+			e.preventDefault();
+			contribute();
+			return;
+		}
+		if (e.key === 'Tab') {
+			e.preventDefault();
+			const ta = textareaEl;
+			if (!ta) return;
+			const start = ta.selectionStart;
+			const end = ta.selectionEnd;
+			if (e.shiftKey) {
+				const lineStart = addMarkdown.lastIndexOf('\n', start - 1) + 1;
+				if (addMarkdown.slice(lineStart, lineStart + 2) === '  ') {
+					addMarkdown = addMarkdown.slice(0, lineStart) + addMarkdown.slice(lineStart + 2);
+					tick().then(() => {
+						ta.selectionStart = Math.max(lineStart, start - 2);
+						ta.selectionEnd = Math.max(lineStart, end - 2);
+					});
+				}
+			} else {
+				addMarkdown = addMarkdown.slice(0, start) + '  ' + addMarkdown.slice(end);
+				tick().then(() => {
+					ta.selectionStart = ta.selectionEnd = start + 2;
+				});
+			}
+			saveContribDraft();
+		}
+	}
+
+	async function handleDroppedFile(file: File) {
+		if (
+			!file.name.endsWith('.md') &&
+			!file.name.endsWith('.markdown') &&
+			!file.name.endsWith('.txt')
+		) {
+			addError = 'Drop markdown (.md) or text files only.';
+			return;
+		}
+		try {
+			const text = await file.text();
+			addMarkdown = text;
+			const match = text.match(/^#\s+(.+)$/m);
+			addTitle = match ? match[1].trim() : file.name.replace(/\.[^/.]+$/, '');
+			titleTouched = true;
+			saveContribDraft();
+			await tick();
+			textareaEl?.focus();
+		} catch {
+			addError = 'Could not read the dropped file.';
+		}
+	}
+
+	function onDropstripDrop(e: DragEvent) {
+		e.preventDefault();
+		dropActive = false;
+		if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+			const f = e.dataTransfer.files[0];
+			if (f) handleDroppedFile(f);
+		}
+	}
 	// Docs added from this page, shown immediately instead of via a reload:
 	// the server counts one view per load, and a contributor should not spend
 	// the folder's view budget on their own write.
@@ -154,8 +275,7 @@
 
 	async function openAddForm() {
 		addOpen = true;
-		// The tile is the last item in the grid, so on a long folder the form
-		// opens below the fold. Focusing the first field scrolls it into view.
+		restoreContribDraft();
 		await tick();
 		addTitleEl?.focus();
 	}
@@ -384,8 +504,13 @@ const out = (await res.json().catch(() => ({}))) as {
 				}
 			];
 			addMarkdown = '';
+			addTitle = '';
+			titleTouched = false;
+			try {
+				localStorage.removeItem(DRAFT_KEY(data.id));
+			} catch {}
 			if (addName.trim()) saveName(addName.trim());
-			addOk = `Added “${newTitle}” to this folder.`;
+			addOk = `Added "${newTitle}" to this folder.`;
 		} catch {
 			addError = 'Could not reach the server. Check your connection.';
 		} finally {
@@ -590,11 +715,50 @@ const out = (await res.json().catch(() => ({}))) as {
 							}}
 							class="mt-4"
 						>
+							<!-- Dropzone for files -->
+							<div
+								role="button"
+								tabindex="0"
+								onclick={() => fileInputEl?.click()}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										fileInputEl?.click();
+									}
+								}}
+								ondragover={(e) => {
+									e.preventDefault();
+									dropActive = true;
+								}}
+								ondragleave={() => (dropActive = false)}
+								ondrop={onDropstripDrop}
+								class="mb-4 flex cursor-pointer items-center justify-center gap-2 border border-dashed py-3 px-4 text-center text-xs transition {dropActive ? 'border-iris bg-iris/5 text-iris' : 'border-line text-ink-soft hover:border-iris hover:text-iris dark:border-night-line dark:text-slate-400'}"
+							>
+								<FileGlyph kind="doc" class="size-4 shrink-0" />
+								<span>Drop a <code>.md</code> file here, or click to browse</span>
+								<input
+									type="file"
+									accept=".md,.markdown,.txt,text/markdown,text/plain"
+									bind:this={fileInputEl}
+									class="hidden"
+									onchange={(e) => {
+										const target = e.currentTarget as HTMLInputElement;
+										if (target.files && target.files.length > 0) {
+											handleDroppedFile(target.files[0]);
+										}
+									}}
+								/>
+							</div>
+
 							<label class="block">
 								<span class="mb-1.5 block text-sm font-medium">Title</span>
 								<input
 									bind:this={addTitleEl}
 									bind:value={addTitle}
+									oninput={() => {
+										titleTouched = true;
+										saveContribDraft();
+									}}
 									maxlength="200"
 									placeholder="Document title"
 									class="w-full border border-line bg-paper px-3.5 py-2.5 text-[15px] placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
@@ -603,17 +767,31 @@ const out = (await res.json().catch(() => ({}))) as {
 							<label class="mt-4 block">
 								<span class="mb-1.5 block text-sm font-medium">Markdown</span>
 								<textarea
+									bind:this={textareaEl}
 									bind:value={addMarkdown}
-									oninput={() => {
-										addError = null;
-										addOk = null;
-									}}
+									oninput={onMarkdownInput}
+									onkeydown={onTextareaKeydown}
 									rows="10"
 									spellcheck="false"
 									placeholder={'# Your doc\n\nWrite it in markdown.'}
 									class="w-full border border-line bg-paper px-3.5 py-3 font-mono text-[13.5px] leading-relaxed placeholder:text-ink-soft/50 focus:border-iris dark:border-night-line dark:bg-night dark:placeholder:text-slate-600"
 								></textarea>
 							</label>
+
+							<!-- Size meter -->
+							<div class="mt-2 flex items-center justify-between text-xs text-ink-soft dark:text-slate-500">
+								<span class="font-mono">{kbLabel} / 512 KB</span>
+								{#if byteLength > MAX_BYTES * 0.9}
+									<span class="text-amber-500 font-medium">Approaching size limit</span>
+								{/if}
+							</div>
+							<div class="mt-1 h-1 w-full overflow-hidden bg-line dark:bg-night-line">
+								<div
+									class="h-full transition-all duration-150 {byteLength > MAX_BYTES ? 'bg-red-500' : 'bg-iris'}"
+									style="width: {percent}%"
+								></div>
+							</div>
+
 							<div class="mt-4">
 								<!-- Label is bound by id rather than wrapping: a button inside a
 								     <label> would also activate the label's control on click. -->
@@ -652,13 +830,16 @@ const out = (await res.json().catch(() => ({}))) as {
 									{addOk}
 								</p>
 							{/if}
-							<button
-								type="submit"
-								disabled={addBusy}
-								class="btn-accent mt-4 inline-flex items-center justify-center px-5 py-2.5 text-[15px] font-semibold transition disabled:opacity-50"
-							>
-{addBusy ? 'Adding…' : 'Add to folder'}
-							</button>
+							<div class="mt-4 flex items-center justify-between gap-3">
+								<button
+									type="submit"
+									disabled={addBusy || byteLength > MAX_BYTES}
+									class="btn-accent inline-flex items-center justify-center px-5 py-2.5 text-[15px] font-semibold transition disabled:opacity-50"
+								>
+									{addBusy ? 'Adding…' : 'Add to folder'}
+								</button>
+								<span class="font-mono text-xs text-ink-soft dark:text-slate-500">Cmd+Enter to submit</span>
+							</div>
 						</form>
 					</div>
 				</section>

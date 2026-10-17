@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import Toast from '$lib/components/Toast.svelte';
 	import DeleteDocButton from '$lib/components/DeleteDocButton.svelte';
@@ -502,7 +503,28 @@
 	 * too, and a header that also counts stops being the container's name and
 	 * starts competing with what it holds.
 	 */
-	const headerMeta = 'Docs you have shared, and the folder links you have sent.';
+	const activeFolderName = $derived.by(() => {
+		const f = filter;
+		if (f.kind === 'folder') {
+			return folders.find((x) => x.id === f.id)?.name ?? null;
+		}
+		if (f.kind === 'none') {
+			return 'Uncategorised';
+		}
+		return null;
+	});
+
+	const headerTitle = $derived(activeFolderName ? activeFolderName : 'Shared from this browser');
+	const headerEyebrow = $derived(filter.kind === 'folder' ? 'Folder' : 'Library');
+	const headerMeta = $derived(
+		activeFolderName
+			? `Filing into ${activeFolderName}`
+			: 'Docs you have shared, and the folder links you have sent.'
+	);
+	const newDocHref = $derived.by(() => {
+		const f = filter;
+		return f.kind === 'folder' ? `/?folder=${encodeURIComponent(f.id)}` : '/';
+	});
 
 	const docsStatus = $derived.by(() => {
 		// Captured to a local so the narrowing survives into the callbacks below.
@@ -520,7 +542,6 @@
 	const linksStatus = $derived(
 		`${bundles.length} ${bundles.length === 1 ? 'link' : 'links'} shared`
 	);
-
 	/** Whether anything at all is worth drawing a two-pane layout for. */
 	const hasShelf = $derived(entries.length > 0 || folders.length > 0 || bundles.length > 0);
 
@@ -537,6 +558,69 @@
 		'my-1 w-full min-w-0 rounded-sm border border-line bg-surface px-2 py-1 text-[13px] text-ink outline-none focus:border-iris dark:border-night-line dark:bg-night-surface dark:text-white';
 
 	/* ----------------------------------------------------------- drag/drop */
+	let externalDragOver = $state(false);
+
+	async function handleExternalFile(file: File, targetFolderId?: string | null) {
+		if (
+			!file.name.endsWith('.md') &&
+			!file.name.endsWith('.markdown') &&
+			!file.name.endsWith('.txt')
+		) {
+			showToast('Drop markdown (.md) or text files only.');
+			return;
+		}
+		try {
+			const text = await file.text();
+			const titleMatch = text.match(/^#\s+(.+)$/m);
+			const title = titleMatch ? titleMatch[1].trim() : file.name.replace(/\.[^/.]+$/, '');
+			const folder = targetFolderId ?? (filter.kind === 'folder' ? filter.id : null);
+			sessionStorage.setItem(
+				'sharemd-pending-drop',
+				JSON.stringify({
+					title,
+					markdown: text,
+					folder
+				})
+			);
+			goto(folder ? `/?folder=${encodeURIComponent(folder)}` : '/');
+		} catch {
+			showToast('Failed to read dropped file.');
+		}
+	}
+
+	function onWindowDragOver(e: DragEvent) {
+		if (e.dataTransfer?.types?.includes('Files')) {
+			e.preventDefault();
+			externalDragOver = true;
+		}
+	}
+
+	function onWindowDragLeave(e: DragEvent) {
+		if (e.clientX <= 0 || e.clientY <= 0) {
+			externalDragOver = false;
+		}
+	}
+
+	function onWindowDrop(e: DragEvent) {
+		if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+			e.preventDefault();
+			externalDragOver = false;
+			const file = e.dataTransfer.files[0];
+			if (file) handleExternalFile(file);
+		}
+	}
+
+	function onFolderDrop(e: DragEvent, folderId: string | null) {
+		e.preventDefault();
+		dropTarget = null;
+		externalDragOver = false;
+		if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+			const file = e.dataTransfer.files[0];
+			if (file) handleExternalFile(file, folderId);
+			return;
+		}
+		onDrop(folderId);
+	}
 
 	function onDragStart(e: DragEvent, id: string) {
 		dragId = id;
@@ -554,6 +638,17 @@
 		onDragEnd();
 		if (id) moveTo(id, folderId);
 	}
+
+	onMount(() => {
+		window.addEventListener('dragover', onWindowDragOver);
+		window.addEventListener('dragleave', onWindowDragLeave);
+		window.addEventListener('drop', onWindowDrop);
+		return () => {
+			window.removeEventListener('dragover', onWindowDragOver);
+			window.removeEventListener('dragleave', onWindowDragLeave);
+			window.removeEventListener('drop', onWindowDrop);
+		};
+	});
 </script>
 
 <svelte:head>
@@ -562,11 +657,33 @@
 </svelte:head>
 
 <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
+{#if externalDragOver}
+	<div class="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-surface/80 backdrop-blur-xs p-6">
+		<div class="flex flex-col items-center gap-3 rounded-lg border-2 border-dashed border-iris bg-paper p-8 text-center shadow-xl dark:bg-night">
+			<FileGlyph kind="doc" class="size-10 text-iris" />
+			<p class="text-base font-semibold text-ink dark:text-white">Drop markdown file here</p>
+			<p class="text-xs text-ink-soft dark:text-slate-400">
+				{activeFolderName ? `Will open in editor filed into ${activeFolderName}` : 'Will open in editor'}
+			</p>
+		</div>
+	</div>
+{/if}
 	<!-- The container is typographic and rule-divided; everything inside it is
 	     boxed. Same `PaneHeader` the folder page uses, so an owner and a reader
 	     land on the same chrome. -->
-	<PaneHeader eyebrow="Library" title="Shared from this browser">
-		{#snippet meta()}{headerMeta}{/snippet}
+	<PaneHeader eyebrow={headerEyebrow} title={headerTitle}>
+		{#snippet meta()}
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<span>{headerMeta}</span>
+				<a
+					href={newDocHref}
+					class="btn-accent inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold transition"
+				>
+					<FileGlyph kind="plus" class="size-4 shrink-0" />
+					<span>New doc</span>
+				</a>
+			</div>
+		{/snippet}
 	</PaneHeader>
 
 	{#if !ready}
@@ -623,10 +740,7 @@
 					dropTarget = '__none__';
 				}}
 				ondragleave={() => (dropTarget = dropTarget === '__none__' ? null : dropTarget)}
-				ondrop={(e) => {
-					e.preventDefault();
-					onDrop(null);
-				}}
+				ondrop={(e) => onFolderDrop(e, null)}
 			/>
 
 			<!-- A shared folder and the link that was sent for it are one thing the
@@ -709,10 +823,7 @@
 								dropTarget = f.id;
 							}}
 							ondragleave={() => (dropTarget = dropTarget === f.id ? null : dropTarget)}
-							ondrop={(e) => {
-								e.preventDefault();
-								onDrop(f.id);
-							}}
+							ondrop={(e) => onFolderDrop(e, f.id)}
 						>
 							{#snippet actions()}
 								<button
