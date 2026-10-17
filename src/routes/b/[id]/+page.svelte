@@ -9,6 +9,7 @@
 	import DocTile from '$lib/components/DocTile.svelte';
 	import PaneHeader from '$lib/components/PaneHeader.svelte';
 	import FileGlyph from '$lib/components/FileGlyph.svelte';
+	import FileRow from '$lib/components/FileRow.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { RULE, SUBTLE } from '$lib/components/fileSkin';
 	import { noteViewed } from '$lib/recent';
@@ -65,6 +66,14 @@
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
 	let fileInputEl = $state<HTMLInputElement | null>(null);
 	let dropActive = $state(false);
+	let viewMode = $state<'list' | 'grid'>('grid');
+
+	function setViewMode(mode: 'list' | 'grid') {
+		viewMode = mode;
+		try {
+			localStorage.setItem('sharemd-view-mode', mode);
+		} catch {}
+	}
 
 	const MAX_BYTES = 512 * 1024;
 	const byteLength = $derived(new TextEncoder().encode(addMarkdown).length);
@@ -357,6 +366,10 @@
 
 	onMount(() => {
 		addName = loadName() ?? '';
+		try {
+			const savedMode = localStorage.getItem('sharemd-view-mode');
+			if (savedMode === 'list' || savedMode === 'grid') viewMode = savedMode;
+		} catch {}
 
 		// Follow later viewer picks (ThemePicker) so the links built here match
 		// what is on screen. Compare-then-bail: setAttribute fires the observer
@@ -594,8 +607,40 @@ const out = (await res.json().catch(() => ({}))) as {
 
 		<PaneHeader eyebrow="Folder" title={data.title}>
 			{#snippet meta()}
-				Shared {timeAgo(data.createdAt)} · {data.views}
-				{data.views === 1 ? 'view' : 'views'}
+				<div class="flex flex-wrap items-center justify-between gap-3">
+					<span>
+						Shared {timeAgo(data.createdAt)} · {data.views}
+						{data.views === 1 ? 'view' : 'views'}
+					</span>
+					<div class="inline-flex rounded-sm border border-line p-0.5 dark:border-night-line">
+						<button
+							type="button"
+							onclick={() => setViewMode('list')}
+							class="rounded-xs p-1 transition {viewMode === 'list'
+								? 'bg-line/60 text-ink dark:bg-night-line/80 dark:text-white'
+								: 'text-ink-soft hover:text-ink dark:text-slate-500'}"
+							aria-label="List view"
+							title="List view"
+						>
+							<svg class="size-3.5" viewBox="0 0 16 16" fill="currentColor">
+								<path d="M2 3.5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 3.5Zm0 4.5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 8Zm0 4.5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" />
+							</svg>
+						</button>
+						<button
+							type="button"
+							onclick={() => setViewMode('grid')}
+							class="rounded-xs p-1 transition {viewMode === 'grid'
+								? 'bg-line/60 text-ink dark:bg-night-line/80 dark:text-white'
+								: 'text-ink-soft hover:text-ink dark:text-slate-500'}"
+							aria-label="Grid view"
+							title="Grid view"
+						>
+							<svg class="size-3.5" viewBox="0 0 16 16" fill="currentColor">
+								<path d="M2.5 2.5h4v4h-4v-4Zm7 0h4v4h-4v-4Zm-7 7h4v4h-4v-4Zm7 0h4v4h-4v-4Z" />
+							</svg>
+						</button>
+					</div>
+				</div>
 			{/snippet}
 		</PaneHeader>
 
@@ -612,66 +657,103 @@ const out = (await res.json().catch(() => ({}))) as {
 			<!-- The file grid. auto-fill reflows instead of overflowing: two tiles
 			     across on a phone, three from 640px, five on a wide desktop.
 			     min() on the floor means it can never demand more than the row. -->
-			<ul
-				class="mt-6 grid grid-cols-[repeat(auto-fill,minmax(min(148px,100%),1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-4"
-			>
-				{#each members as m, i (m.id)}
-					<li class="rise min-w-0" style="animation-delay: {60 + Math.min(i * 26, 420)}ms">
-						{#if m.gone}
-							<!-- Unavailable members stay visible and stay in the creator's
-							     order, but are never an anchor: there is no link to a page
-							     that would only bounce the reader. Dashed outline and a
-							     struck title say "not here" at a glance. -->
-							<DocTile
-								label={m.title}
-								dashed
-								glyphDashed
-								faint
-								strike
-								tooltip={m.title}
-							>
-								{#snippet meta()}
-									<span class="text-[10px] tracking-[0.12em] uppercase">
-										{m.gone === 'expired' ? 'expired' : 'view limit'}
-									</span>
-								{/snippet}
-							</DocTile>
-						{:else}
-							<DocTile label={m.title} href={memberHref(m)} tooltip={memberSummary(m)}>
-								{#snippet meta()}
-									{m.readMins} min read{#if m.contributorName}{' · '}<span class="sr-only"
-										>{'added by '}</span
-									>{m.contributorName}{/if}
-								{/snippet}
-							</DocTile>
-						{/if}
-					</li>
-				{/each}
-
-				<!-- Adding is a primary action in a file manager, so it is an entry
-				     in the grid rather than a panel bolted underneath it. Placed
-				     last, which also keeps the keyboard order tiles → form. -->
-				{#if data.canContribute}
-					<li
-						class="rise min-w-0"
-						style="animation-delay: {60 + Math.min(members.length * 26, 420)}ms"
-					>
-						<DocTile
-							as="button"
-							label="Add your own doc"
-							glyph="plus"
-							dashed
-							tooltip="Add your own doc"
-							aria-expanded={addOpen}
-							aria-controls="add-doc-form"
-							onclick={() => (addOpen ? closeAddForm() : openAddForm())}
-							bind:el={addTileEl}
+			{#if viewMode === 'list'}
+				<ul class="mt-6 flex flex-col gap-2">
+					{#each members as m, i (m.id)}
+						<FileRow
+							label={m.title}
+							href={m.gone ? undefined : memberHref(m)}
+							glyph="doc"
 						>
-							{#snippet meta()}New file{/snippet}
-						</DocTile>
-					</li>
-				{/if}
-			</ul>
+							{#snippet meta()}
+								<span>{m.readMins} min read</span>
+								{#if m.contributorName}
+									<span> · added by {m.contributorName}</span>
+								{/if}
+								{#if m.gone}
+									<span class="font-medium text-red-500"> · {m.gone === 'expired' ? 'expired' : 'view limit'}</span>
+								{/if}
+							{/snippet}
+						</FileRow>
+					{/each}
+					{#if data.canContribute}
+						<li>
+							<button
+								type="button"
+								class="flex w-full items-center gap-2 rounded-sm border border-dashed border-line px-3.5 py-2.5 text-left text-sm font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+								onclick={() => (addOpen ? closeAddForm() : openAddForm())}
+							>
+								<FileGlyph kind="plus" class="size-4 shrink-0" />
+								<span>Add your own doc</span>
+							</button>
+						</li>
+					{/if}
+				</ul>
+			{:else}
+				<!-- The file grid. auto-fill reflows instead of overflowing: two tiles
+				     across on a phone, three from 640px, five on a wide desktop.
+				     min() on the floor means it can never demand more than the row. -->
+				<ul
+					class="mt-6 grid grid-cols-[repeat(auto-fill,minmax(min(148px,100%),1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-4"
+				>
+					{#each members as m, i (m.id)}
+						<li class="rise min-w-0" style="animation-delay: {60 + Math.min(i * 26, 420)}ms">
+							{#if m.gone}
+								<!-- Unavailable members stay visible and stay in the creator's
+								     order, but are never an anchor: there is no link to a page
+								     that would only bounce the reader. Dashed outline and a
+								     struck title say "not here" at a glance. -->
+								<DocTile
+									label={m.title}
+									dashed
+									glyphDashed
+									faint
+									strike
+									tooltip={m.title}
+								>
+									{#snippet meta()}
+										<span class="text-[10px] tracking-[0.12em] uppercase">
+											{m.gone === 'expired' ? 'expired' : 'view limit'}
+										</span>
+									{/snippet}
+								</DocTile>
+							{:else}
+								<DocTile label={m.title} href={memberHref(m)} tooltip={memberSummary(m)}>
+									{#snippet meta()}
+										{m.readMins} min read{#if m.contributorName}{' · '}<span class="sr-only"
+											>{'added by '}</span
+										>{m.contributorName}{/if}
+									{/snippet}
+								</DocTile>
+							{/if}
+						</li>
+					{/each}
+
+					<!-- Adding is a primary action in a file manager, so it is an entry
+					     in the grid rather than a panel bolted underneath it. Placed
+					     last, which also keeps the keyboard order tiles → form. -->
+					{#if data.canContribute}
+						<li
+							class="rise min-w-0"
+							style="animation-delay: {60 + Math.min(members.length * 26, 420)}ms"
+						>
+							<DocTile
+								as="button"
+								label="Add your own doc"
+								glyph="plus"
+								dashed
+								tooltip="Add your own doc"
+								aria-expanded={addOpen}
+								aria-controls="add-doc-form"
+								onclick={() => (addOpen ? closeAddForm() : openAddForm())}
+								bind:el={addTileEl}
+							>
+								{#snippet meta()}New file{/snippet}
+							</DocTile>
+						</li>
+					{/if}
+				</ul>
+			{/if}
 
 			<StatusBar text={statusLine} />
 		{/if}

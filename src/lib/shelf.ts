@@ -141,7 +141,14 @@ export function updateShelfSlug(id: string, slug: string | null): ShelfEntry | n
 	const entries = load();
 	const target = entries.find((e) => e.id === id);
 	if (!target) return null;
-	const next: ShelfEntry = { ...target, slug, url: `/s/${slug ?? target.id}` };
+	let search = '';
+	if (target.url) {
+		const qIdx = target.url.indexOf('?');
+		if (qIdx !== -1) {
+			search = target.url.slice(qIdx);
+		}
+	}
+	const next: ShelfEntry = { ...target, slug, url: `/s/${slug ?? target.id}${search}` };
 	save(entries.map((e) => (e.id === id ? next : e)));
 	return next;
 }

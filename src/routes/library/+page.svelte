@@ -5,6 +5,7 @@
 	import Toast from '$lib/components/Toast.svelte';
 	import DeleteDocButton from '$lib/components/DeleteDocButton.svelte';
 	import FileGlyph from '$lib/components/FileGlyph.svelte';
+	import DocTile from '$lib/components/DocTile.svelte';
 	import FileRow from '$lib/components/FileRow.svelte';
 	import PaneHeader from '$lib/components/PaneHeader.svelte';
 	import SideRow from '$lib/components/SideRow.svelte';
@@ -439,10 +440,27 @@
 		refresh();
 	}
 
-	function removeFolder(f: Folder) {
-		deleteFolder(f.id);
-		refresh();
-		showToast(`"${f.name}" deleted — its docs moved to Uncategorised.`);
+	let armedFolderId = $state<string | null>(null);
+	let armFolderTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function requestRemoveFolder(f: Folder) {
+		if (armedFolderId === f.id) {
+			if (armFolderTimer) clearTimeout(armFolderTimer);
+			armedFolderId = null;
+			deleteFolder(f.id);
+			const cur = filter;
+			if (cur.kind === 'folder' && cur.id === f.id) {
+				filter = { kind: 'all' };
+			}
+			refresh();
+			showToast(`"${f.name}" deleted. Its docs moved to Uncategorised.`);
+		} else {
+			armedFolderId = f.id;
+			if (armFolderTimer) clearTimeout(armFolderTimer);
+			armFolderTimer = setTimeout(() => {
+				armedFolderId = null;
+			}, 3500);
+		}
 	}
 
 	/**
@@ -557,6 +575,14 @@
 	const railInput =
 		'my-1 w-full min-w-0 rounded-sm border border-line bg-surface px-2 py-1 text-[13px] text-ink outline-none focus:border-iris dark:border-night-line dark:bg-night-surface dark:text-white';
 
+	let viewMode = $state<'list' | 'grid'>('list');
+
+	function setViewMode(mode: 'list' | 'grid') {
+		viewMode = mode;
+		try {
+			localStorage.setItem('sharemd-view-mode', mode);
+		} catch {}
+	}
 	/* ----------------------------------------------------------- drag/drop */
 	let externalDragOver = $state(false);
 
@@ -640,6 +666,10 @@
 	}
 
 	onMount(() => {
+		try {
+			const savedMode = localStorage.getItem('sharemd-view-mode');
+			if (savedMode === 'list' || savedMode === 'grid') viewMode = savedMode;
+		} catch {}
 		window.addEventListener('dragover', onWindowDragOver);
 		window.addEventListener('dragleave', onWindowDragLeave);
 		window.addEventListener('drop', onWindowDrop);
@@ -675,13 +705,43 @@
 		{#snippet meta()}
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<span>{headerMeta}</span>
-				<a
-					href={newDocHref}
-					class="btn-accent inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold transition"
-				>
-					<FileGlyph kind="plus" class="size-4 shrink-0" />
-					<span>New doc</span>
-				</a>
+				<div class="flex items-center gap-2">
+					<div class="inline-flex rounded-sm border border-line p-0.5 dark:border-night-line">
+						<button
+							type="button"
+							onclick={() => setViewMode('list')}
+							class="rounded-xs p-1 transition {viewMode === 'list'
+								? 'bg-line/60 text-ink dark:bg-night-line/80 dark:text-white'
+								: 'text-ink-soft hover:text-ink dark:text-slate-500'}"
+							aria-label="List view"
+							title="List view"
+						>
+							<svg class="size-3.5" viewBox="0 0 16 16" fill="currentColor">
+								<path d="M2 3.5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 3.5Zm0 4.5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 8Zm0 4.5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" />
+							</svg>
+						</button>
+						<button
+							type="button"
+							onclick={() => setViewMode('grid')}
+							class="rounded-xs p-1 transition {viewMode === 'grid'
+								? 'bg-line/60 text-ink dark:bg-night-line/80 dark:text-white'
+								: 'text-ink-soft hover:text-ink dark:text-slate-500'}"
+							aria-label="Grid view"
+							title="Grid view"
+						>
+							<svg class="size-3.5" viewBox="0 0 16 16" fill="currentColor">
+								<path d="M2.5 2.5h4v4h-4v-4Zm7 0h4v4h-4v-4Zm-7 7h4v4h-4v-4Zm7 0h4v4h-4v-4Z" />
+							</svg>
+						</button>
+					</div>
+					<a
+						href={newDocHref}
+						class="btn-accent inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold transition"
+					>
+						<FileGlyph kind="plus" class="size-4 shrink-0" />
+						<span>New doc</span>
+					</a>
+				</div>
 			</div>
 		{/snippet}
 	</PaneHeader>
@@ -843,11 +903,11 @@
 								>Rename</button>
 								<button
 									type="button"
-									class={railBtn}
-									onclick={() => removeFolder(f)}
-									aria-label="Delete {f.name}"
-									title="Delete — its docs move to Uncategorised"
-								>Delete</button>
+									class="{railBtn} transition {armedFolderId === f.id ? 'font-semibold text-red-500 hover:text-red-600 dark:text-red-400' : ''}"
+									onclick={() => requestRemoveFolder(f)}
+									aria-label={armedFolderId === f.id ? `Confirm delete ${f.name}` : `Delete ${f.name}`}
+									title={armedFolderId === f.id ? 'Click again to confirm delete' : 'Delete: its docs move to Uncategorised'}
+								>{armedFolderId === f.id ? 'Sure?' : 'Delete'}</button>
 							{/snippet}
 						</SideRow>
 					{/if}
@@ -901,69 +961,87 @@
 			<!-- ============================================ contents -->
 			<div class="min-w-0 flex-1">
 				{#if visible.length}
-					<ul class="flex flex-col gap-2">
-						{#each visible as entry (entry.id)}
-							<!-- The name is the link, exactly as in any file manager. `Open` stays
-							     in the revealed actions so the explicit verb is not lost, and it
-							     costs the row nothing at rest because those actions are laid over
-							     the name rather than reserving space beside it. -->
-							<FileRow
-								label={entry.title}
-								href={docPath(entry)}
-								draggable
-								ondragstart={(e) => onDragStart(e, entry.id)}
-								ondragend={onDragEnd}
-								dimmed={dragId === entry.id}
-							>
-								{#snippet meta()}
-									{docPath(entry)}{entry.createdAt ? ` · ${timeAgo(entry.createdAt)}` : ''}
-								{/snippet}
-								{#snippet control()}
-									<!-- Capped: an uncapped select sizes to its longest folder name and
-									     starves the document title of the row. -->
-									<select
-										class="{FILE_CONTROL} w-36 truncate bg-paper sm:w-40"
-										value={entry.folder ?? ''}
-										aria-label="Folder for {entry.title}"
-										onchange={(e) => moveTo(entry.id, e.currentTarget.value || null)}
+					{#if viewMode === 'list'}
+						<ul class="flex flex-col gap-2">
+							{#each visible as entry (entry.id)}
+								<!-- The name is the link, exactly as in any file manager. `Open` stays
+								     in the revealed actions so the explicit verb is not lost, and it
+								     costs the row nothing at rest because those actions are laid over
+								     the name rather than reserving space beside it. -->
+								<FileRow
+									label={entry.title}
+									href={docPath(entry)}
+									draggable
+									ondragstart={(e) => onDragStart(e, entry.id)}
+									ondragend={onDragEnd}
+									dimmed={dragId === entry.id}
+								>
+									{#snippet meta()}
+										{docPath(entry)}{entry.createdAt ? ` · ${timeAgo(entry.createdAt)}` : ''}
+									{/snippet}
+									{#snippet control()}
+										<!-- Capped: an uncapped select sizes to its longest folder name and
+										     starves the document title of the row. -->
+										<select
+											class="{FILE_CONTROL} w-36 truncate bg-paper sm:w-40"
+											value={entry.folder ?? ''}
+											aria-label="Folder for {entry.title}"
+											onchange={(e) => moveTo(entry.id, e.currentTarget.value || null)}
+										>
+											<option value="">Uncategorised</option>
+											{#each folders as f (f.id)}
+												<option value={f.id}>{f.name}</option>
+											{/each}
+										</select>
+									{/snippet}
+									{#snippet actions()}
+										<a href={docPath(entry)} class={FILE_CONTROL}>Open</a>
+										<button
+											type="button"
+											class={FILE_CONTROL}
+											onclick={() => copyDoc(entry)}
+											aria-label="Copy link for {entry.title}"
+										>{copiedId === `doc:${entry.id}` ? 'Copied' : 'Copy'}</button>
+										<button
+											type="button"
+											class={FILE_CONTROL}
+											onclick={() => openDocSettings(entry)}
+											aria-label="Link settings for {entry.title}"
+										>Options</button>
+										<!-- Delete keeps its own arm-then-confirm button; the frame around it
+										     is here so a bare × is not the only unboxed thing in a row of
+										     boxed controls. -->
+										<span
+											class="flex shrink-0 items-center rounded-sm border border-line px-2 py-1 dark:border-night-line"
+										>
+											<DeleteDocButton
+												id={entry.id}
+												title={entry.title}
+												{onDeleted}
+												{onDeleteFailed}
+											/>
+										</span>
+									{/snippet}
+								</FileRow>
+							{/each}
+						</ul>
+					{:else}
+						<ul class="grid grid-cols-[repeat(auto-fill,minmax(min(148px,100%),1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(176px,1fr))] sm:gap-4">
+							{#each visible as entry (entry.id)}
+								<li class="rise min-w-0">
+									<DocTile
+										label={entry.title}
+										href={docPath(entry)}
+										tooltip="{entry.title} · {docPath(entry)}"
 									>
-										<option value="">Uncategorised</option>
-										{#each folders as f (f.id)}
-											<option value={f.id}>{f.name}</option>
-										{/each}
-									</select>
-								{/snippet}
-								{#snippet actions()}
-									<a href={docPath(entry)} class={FILE_CONTROL}>Open</a>
-									<button
-										type="button"
-										class={FILE_CONTROL}
-										onclick={() => copyDoc(entry)}
-										aria-label="Copy link for {entry.title}"
-									>{copiedId === `doc:${entry.id}` ? 'Copied' : 'Copy'}</button>
-									<button
-										type="button"
-										class={FILE_CONTROL}
-										onclick={() => openDocSettings(entry)}
-										aria-label="Link settings for {entry.title}"
-									>Options</button>
-									<!-- Delete keeps its own arm-then-confirm button; the frame around it
-									     is here so a bare × is not the only unboxed thing in a row of
-									     boxed controls. -->
-									<span
-										class="flex shrink-0 items-center rounded-sm border border-line px-2 py-1 dark:border-night-line"
-									>
-										<DeleteDocButton
-											id={entry.id}
-											title={entry.title}
-											{onDeleted}
-											{onDeleteFailed}
-										/>
-									</span>
-								{/snippet}
-							</FileRow>
-						{/each}
-					</ul>
+										{#snippet meta()}
+											<span>{entry.createdAt ? timeAgo(entry.createdAt) : docPath(entry)}</span>
+										{/snippet}
+									</DocTile>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				{:else}
 					<div class="border border-dashed px-5 py-12 text-center {RULE}">
 						<p class="text-[15px] font-medium">

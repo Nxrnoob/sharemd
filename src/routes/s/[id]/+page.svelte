@@ -1,7 +1,18 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
-	import { owns, getOwnedToken, updateShelfTitle, getShelf, getFolders } from '$lib/shelf';
+	import {
+		owns,
+		getOwnedToken,
+		updateShelfTitle,
+		getShelf,
+		getFolders,
+		deleteOwnedDoc,
+		removeFromShelf,
+		updateDocLinkSettings,
+		updateShelfSlug,
+		type DocSettingsPatch
+	} from '$lib/shelf';
 	import { page } from '$app/state';
 	import { codeCopy } from '$lib/actions/codeCopy';
 	import { copyText } from '$lib/clipboard';
@@ -63,6 +74,132 @@
 	let editBusy = $state(false);
 	let editError = $state<string | null>(null);
 	let scrolledPastHeader = $state(false);
+
+	let deleteArmed = $state(false);
+	let deleteTimer: ReturnType<typeof setTimeout> | null = null;
+	let deleteWorking = $state(false);
+
+	async function handleDeleteDoc() {
+		if (deleteWorking) return;
+		if (!deleteArmed) {
+			deleteArmed = true;
+			if (deleteTimer) clearTimeout(deleteTimer);
+			deleteTimer = setTimeout(() => {
+				deleteArmed = false;
+				deleteTimer = null;
+			}, 4000);
+			return;
+		}
+		if (deleteTimer) clearTimeout(deleteTimer);
+		const token = getOwnedToken(data.id);
+		if (!token) {
+			flash('You do not own this doc.');
+			deleteArmed = false;
+			return;
+		}
+		deleteWorking = true;
+		const res = await deleteOwnedDoc(data.id, token);
+		deleteWorking = false;
+		deleteArmed = false;
+		if (res === 'deleted') {
+			removeFromShelf(data.id);
+			goto('/library');
+		} else {
+			flash(`Delete failed: ${res}`);
+		}
+	}
+
+	let settingsOpen = $state(false);
+	let sSlug = $state('');
+	let sPassword = $state('');
+	let sRemovePassword = $state(false);
+	let sExpiry = $state<'keep' | 'clear' | '3600' | '86400' | '604800' | '2592000'>('keep');
+	let sMaxViews = $state('');
+	let sRemoveViews = $state(false);
+	let sSaving = $state(false);
+	let sError = $state<string | null>(null);
+
+	const sSlugOk = $derived(!sSlug.trim() || /^[a-z0-9-]{3,32}$/.test(sSlug.trim()));
+	const sPasswordError = $derived.by(() => {
+		if (sRemovePassword || !sPassword) return null;
+		return sPassword.trim().length >= 4 ? null : 'Min 4 characters.';
+	});
+	const sMaxViewsNum = $derived.by(() => {
+		if (sRemoveViews || !sMaxViews.trim()) return null;
+		const n = parseInt(sMaxViews.trim(), 10);
+		return Number.isInteger(n) && n >= 1 ? n : NaN;
+	});
+	const sMaxViewsError = $derived.by(() => {
+		if (sRemoveViews || !sMaxViews.trim()) return null;
+		return Number.isNaN(sMaxViewsNum) ? 'Must be an integer >= 1.' : null;
+	});
+
+	function openSettings() {
+		sSlug = data.slug ?? '';
+		sPassword = '';
+		sRemovePassword = false;
+		sExpiry = 'keep';
+		sMaxViews = '';
+		sRemoveViews = false;
+		sError = null;
+		settingsOpen = true;
+	}
+
+	function closeSettings() {
+		settingsOpen = false;
+		sError = null;
+	}
+
+	async function saveSettings() {
+		if (!sSlugOk || sPasswordError || sMaxViewsError || sSaving) return;
+		const token = getOwnedToken(data.id);
+		if (!token) {
+			sError = 'You do not hold the edit token for this doc.';
+			return;
+		}
+
+		const patch: DocSettingsPatch = {};
+		const cleanSlug = sSlug.trim();
+		if (cleanSlug !== (data.slug ?? '')) {
+			patch.slug = cleanSlug || null;
+		}
+
+		if (sRemovePassword) {
+			patch.password = '';
+		} else if (sPassword.trim()) {
+			patch.password = sPassword.trim();
+		}
+
+		if (sExpiry === 'clear') {
+			patch.expiresInSec = null;
+		} else if (sExpiry !== 'keep') {
+			patch.expiresInSec = parseInt(sExpiry, 10);
+		}
+
+		if (sRemoveViews) {
+			patch.maxViews = null;
+		} else if (typeof sMaxViewsNum === 'number' && !Number.isNaN(sMaxViewsNum)) {
+			patch.maxViews = sMaxViewsNum;
+		}
+
+		sSaving = true;
+		sError = null;
+
+		const res = await updateDocLinkSettings(data.id, token, patch);
+		sSaving = false;
+		if (!res.ok) {
+			sError = res.error;
+			return;
+		}
+
+		if (patch.slug !== undefined) {
+			updateShelfSlug(data.id, res.slug);
+		}
+
+		settingsOpen = false;
+		flash('Link settings saved.');
+		invalidateAll();
+	}
 	let editTextAreaEl: HTMLTextAreaElement | null = $state(null);
 	let uploadingEditImage = $state(false);
 	let editUploadedImages = $state<{ url: string; name: string; filename: string }[]>([]);
@@ -632,6 +769,23 @@
 		<div class="flex flex-wrap items-center gap-1.5 print:hidden sm:shrink-0">
 			{#if isOwner}
 				<button
+					onclick={openSettings}
+					class="border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
+					title="Change link settings (password, expiry, slug, view limits)"
+				>
+					Options
+				</button>
+				<button
+					onclick={handleDeleteDoc}
+					disabled={deleteWorking}
+					class="border border-line px-3 py-1.5 text-[13px] font-medium transition {deleteArmed
+						? 'border-red-500 font-semibold text-red-500 hover:text-red-600 dark:text-red-400'
+						: 'hover:border-red-500 hover:text-red-500 dark:border-night-line'}"
+					title={deleteArmed ? 'Click again to permanently delete' : 'Delete this doc'}
+				>
+					{deleteArmed ? 'Sure?' : 'Delete'}
+				</button>
+				<button
 					onclick={startEditing}
 					class="border border-line px-3 py-1.5 text-[13px] font-medium transition hover:border-iris hover:text-iris dark:border-night-line"
 				>
@@ -834,3 +988,140 @@
 <Toast message={toast} />
 <TocFloating items={toc} activeId={activeId} {folder} {linkedPages} />
 <BackToTop />
+{#if settingsOpen}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="reader-doc-settings-title"
+	>
+		<div class="fixed inset-0 bg-black/70 backdrop-blur-xs" onclick={closeSettings} aria-hidden="true"></div>
+
+		<div
+			class="rise relative z-10 w-full max-w-md border border-line bg-surface p-5 shadow-2xl dark:border-night-line dark:bg-night-surface"
+		>
+			<div class="flex items-start justify-between gap-4">
+				<h2 id="reader-doc-settings-title" class="font-display text-[17px] font-bold tracking-tight text-ink">
+					Link settings
+				</h2>
+				<button
+					type="button"
+					onclick={closeSettings}
+					class="font-mono text-xs text-ink-soft transition hover:text-iris"
+					aria-label="Close link settings"
+				>
+					Esc
+				</button>
+			</div>
+
+			<p class="mt-1.5 truncate text-[13px] text-ink-soft dark:text-slate-400">
+				{data.title}
+			</p>
+			<p class="mt-2 text-xs text-ink-soft dark:text-slate-500">
+				Anything you leave alone stays as it is.
+			</p>
+
+			<div class="mt-4 space-y-3.5">
+				<label class="block">
+					<span class="mb-1.5 block text-sm font-medium">Custom slug</span>
+					<input
+						bind:value={sSlug}
+						maxlength="32"
+						placeholder="my-doc-name"
+						autocomplete="off"
+						spellcheck="false"
+						class="w-full border bg-paper px-3 py-2 font-mono text-[13px] placeholder:text-ink-soft/50 focus:border-iris dark:bg-night dark:placeholder:text-slate-600 {sSlugOk
+							? 'border-line dark:border-night-line'
+							: 'border-iris'}"
+					/>
+					<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">
+						{sSlugOk ? 'a-z, 0-9 and dashes, 3 to 32 long. Clear it to go back to the id link.' : 'Letters, numbers and dashes only.'}
+					</span>
+				</label>
+
+				<label class="block">
+					<span class="mb-1.5 block text-sm font-medium">Password</span>
+					<input
+						type="password"
+						bind:value={sPassword}
+						disabled={sRemovePassword}
+						placeholder="Leave blank to keep it as it is"
+						autocomplete="new-password"
+						class="w-full border bg-paper px-3 py-2 text-sm placeholder:text-ink-soft/50 focus:border-iris disabled:opacity-50 dark:bg-night dark:placeholder:text-slate-600 {sPasswordError
+							? 'border-iris'
+							: 'border-line dark:border-night-line'}"
+					/>
+					<span class="mt-1 block text-xs text-ink-soft dark:text-slate-500">
+						{sPasswordError ?? 'Set a new one, or leave blank to keep whatever is there.'}
+					</span>
+				</label>
+
+				<label class="flex items-center gap-2 text-sm">
+					<input type="checkbox" bind:checked={sRemovePassword} class="accent-iris" />
+					<span class="text-ink-soft dark:text-slate-400">Remove the password from this link</span>
+				</label>
+
+				<div class="grid grid-cols-2 gap-3">
+					<label class="block">
+						<span class="mb-1.5 block text-sm font-medium">Expires</span>
+						<select
+							bind:value={sExpiry}
+							class="w-full border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-iris dark:border-night-line dark:bg-night dark:text-white"
+						>
+							<option value="keep">Leave unchanged</option>
+							<option value="clear">Never (remove expiry)</option>
+							<option value="3600">1 hour from now</option>
+							<option value="86400">1 day from now</option>
+							<option value="604800">7 days from now</option>
+							<option value="2592000">30 days from now</option>
+						</select>
+					</label>
+
+					<label class="block">
+						<span class="mb-1.5 block text-sm font-medium">Max views</span>
+						<input
+							type="number"
+							min="1"
+							step="1"
+							bind:value={sMaxViews}
+							disabled={sRemoveViews}
+							placeholder="Leave unchanged"
+							class="w-full border bg-paper px-3 py-2 text-sm text-ink focus:border-iris disabled:opacity-50 dark:bg-night dark:text-white {sMaxViewsError
+								? 'border-iris'
+								: 'border-line dark:border-night-line'}"
+						/>
+					</label>
+				</div>
+
+				<label class="flex items-center gap-2 text-sm">
+					<input type="checkbox" bind:checked={sRemoveViews} class="accent-iris" />
+					<span class="text-ink-soft dark:text-slate-400">Remove view limit (unlimited)</span>
+				</label>
+
+				{#if sError}
+					<p role="alert" class="text-sm font-medium text-red-600 dark:text-red-300">
+						{sError}
+					</p>
+				{/if}
+			</div>
+
+			<div class="mt-5 flex items-center justify-end gap-2">
+				<button
+					type="button"
+					onclick={closeSettings}
+					class="rounded-sm border border-line px-3.5 py-1.5 text-sm text-ink-soft transition hover:text-ink dark:border-night-line"
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					onclick={saveSettings}
+					disabled={!sSlugOk || !!sPasswordError || !!sMaxViewsError || sSaving}
+					class="btn-accent px-4 py-1.5 text-sm font-semibold transition disabled:opacity-50"
+				>
+					{sSaving ? 'Saving…' : 'Save settings'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
