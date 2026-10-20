@@ -245,11 +245,34 @@
 		return { byFolder, none };
 	});
 
+	type SortOption = 'newest' | 'oldest' | 'title-asc' | 'title-desc';
+
+	let searchQuery = $state('');
+	let sortBy = $state<SortOption>('newest');
+
 	const visible = $derived.by(() => {
 		const f = filter;
-		if (f.kind === 'all') return entries;
-		if (f.kind === 'none') return entries.filter((e) => !e.folder);
-		return entries.filter((e) => e.folder === f.id);
+		let list = entries;
+		if (f.kind === 'none') list = entries.filter((e) => !e.folder);
+		else if (f.kind === 'folder') list = entries.filter((e) => e.folder === f.id);
+
+		const q = searchQuery.trim().toLowerCase();
+		if (q) {
+			list = list.filter(
+				(e) =>
+					e.title.toLowerCase().includes(q) ||
+					(e.slug && e.slug.toLowerCase().includes(q)) ||
+					e.id.toLowerCase().includes(q)
+			);
+		}
+
+		return [...list].sort((a, b) => {
+			if (sortBy === 'newest') return (b.createdAt || 0) - (a.createdAt || 0);
+			if (sortBy === 'oldest') return (a.createdAt || 0) - (b.createdAt || 0);
+			if (sortBy === 'title-asc') return a.title.localeCompare(b.title);
+			if (sortBy === 'title-desc') return b.title.localeCompare(a.title);
+			return 0;
+		});
 	});
 
 	// A folder can be deleted while selected; never strand the view on nothing.
@@ -545,16 +568,17 @@
 	});
 
 	const docsStatus = $derived.by(() => {
-		// Captured to a local so the narrowing survives into the callbacks below.
 		const f = filter;
 		const total = entries.length;
+		const q = searchQuery.trim();
+		const countStr = `${visible.length} of ${total} ${total === 1 ? 'doc' : 'docs'}`;
+		if (q) return `${countStr} · matching "${q}"`;
 		if (f.kind === 'all') return `${total} ${total === 1 ? 'doc' : 'docs'}`;
-		const n = visible.length;
 		if (f.kind === 'none') {
-			return `${n} of ${total} ${total === 1 ? 'doc' : 'docs'} · uncategorised`;
+			return `${visible.length} of ${total} ${total === 1 ? 'doc' : 'docs'} · uncategorised`;
 		}
 		const name = folders.find((x) => x.id === f.id)?.name;
-		return `${n} of ${total} ${total === 1 ? 'doc' : 'docs'} · in ${name ?? 'that folder'}`;
+		return `${visible.length} of ${total} ${total === 1 ? 'doc' : 'docs'} · in ${name ?? 'that folder'}`;
 	});
 
 	const linksStatus = $derived(
@@ -960,6 +984,53 @@
 
 			<!-- ============================================ contents -->
 			<div class="min-w-0 flex-1">
+				<!-- Search and Sort controls -->
+				<div class="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+					<div class="relative min-w-[160px] flex-1 max-w-sm">
+						<svg
+							class="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-soft dark:text-slate-500"
+							viewBox="0 0 16 16"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.75"
+						>
+							<circle cx="7" cy="7" r="4.5" />
+							<path d="M10.5 10.5L14 14" stroke-linecap="round" />
+						</svg>
+						<input
+							type="text"
+							bind:value={searchQuery}
+							placeholder="Search docs..."
+							aria-label="Search documents"
+							class="w-full rounded-sm border border-line bg-paper py-1.5 pl-8 pr-7 text-xs text-ink placeholder:text-ink-soft/60 focus:border-iris focus:outline-none dark:border-night-line dark:bg-night dark:text-white dark:placeholder:text-slate-500"
+						/>
+						{#if searchQuery}
+							<button
+								type="button"
+								onclick={() => (searchQuery = '')}
+								class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-ink-soft hover:text-ink dark:text-slate-400"
+								aria-label="Clear search"
+								title="Clear search"
+							>
+								×
+							</button>
+						{/if}
+					</div>
+
+					<div class="flex items-center gap-1.5 text-xs text-ink-soft dark:text-slate-400">
+						<span class="hidden sm:inline text-[11px]">Sort:</span>
+						<select
+							bind:value={sortBy}
+							aria-label="Sort documents"
+							class="rounded-sm border border-line bg-paper px-2 py-1 text-xs text-ink focus:border-iris focus:outline-none dark:border-night-line dark:bg-night dark:text-white"
+						>
+							<option value="newest">Newest</option>
+							<option value="oldest">Oldest</option>
+							<option value="title-asc">Title (A-Z)</option>
+							<option value="title-desc">Title (Z-A)</option>
+						</select>
+					</div>
+				</div>
 				{#if visible.length}
 					{#if viewMode === 'list'}
 						<ul class="flex flex-col gap-2">
@@ -1042,6 +1113,17 @@
 							{/each}
 						</ul>
 					{/if}
+				{:else if searchQuery}
+					<div class="border border-dashed px-5 py-12 text-center {RULE}">
+						<p class="text-[15px] font-medium">No docs matching "{searchQuery}"</p>
+						<button
+							type="button"
+							onclick={() => (searchQuery = '')}
+							class="btn-accent mt-3 inline-flex items-center px-3 py-1 text-xs font-medium"
+						>
+							Clear search
+						</button>
+					</div>
 				{:else}
 					<div class="border border-dashed px-5 py-12 text-center {RULE}">
 						<p class="text-[15px] font-medium">

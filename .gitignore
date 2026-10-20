@@ -30,3 +30,11 @@ vite.config.ts.timestamp-*
 # Uploads
 uploads/
 /uploads/
+
+# Scratch and test artifacts
+.playwright-mcp/
+cat.svelte
+cat-meow-svelte/
+cat-meow-svelte.zip
+cat-bop-*
+sharemd-mywords.txt
