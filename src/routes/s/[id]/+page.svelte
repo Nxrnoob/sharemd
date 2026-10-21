@@ -24,6 +24,7 @@
 	import { noteViewed } from '$lib/recent';
 	import ReadingProgress from '$lib/components/ReadingProgress.svelte';
 	import StickyHeading from '$lib/components/StickyHeading.svelte';
+	import FileGlyph from '$lib/components/FileGlyph.svelte';
 	import {
 		buildThemedUrl,
 		getThemeFromUrl,
@@ -744,6 +745,47 @@
 {:else}
 <ReadingProgress target={articleEl} />
 <StickyHeading text={activeText} />
+
+{#if data.folderContext && data.folderContext.members.length > 1}
+	<!-- Thin browser-style folder tabs strip -->
+	<nav
+		class="border-b border-line bg-paper/95 backdrop-blur-xs dark:border-night-line dark:bg-night/95 print:hidden"
+		aria-label="Folder files"
+	>
+		<div class="mx-auto flex w-full max-w-3xl items-center gap-1.5 px-4 sm:px-6 lg:max-w-7xl">
+			<a
+				href={buildThemedUrl(data.folderContext.href, screenTheme)}
+				class="shrink-0 flex items-center gap-1.5 py-1.5 pr-3 mr-1 text-xs font-medium text-ink-soft transition hover:text-iris border-r border-line dark:border-night-line"
+				title="Back to {data.folderContext.title} folder index"
+			>
+				<FileGlyph kind="folder" class="size-3.5 shrink-0 text-iris" />
+				<span class="max-w-[130px] truncate">{data.folderContext.title}</span>
+			</a>
+
+			<div class="flex flex-1 items-center gap-1 overflow-x-auto no-scrollbar py-1 scroll-smooth">
+				{#each data.folderContext.members as m (m.id)}
+					{@const isActive = m.id === data.id}
+					<a
+						href={m.gone ? undefined : buildThemedUrl(m.href, screenTheme)}
+						class="group relative shrink-0 flex items-center gap-1.5 rounded-t-sm px-3 py-1.5 text-xs font-medium transition border-b-2 {isActive
+							? 'border-iris bg-surface text-ink font-semibold dark:bg-night-surface dark:text-white shadow-xs'
+							: 'border-transparent text-ink-soft hover:bg-surface/50 hover:text-ink dark:text-slate-400 dark:hover:bg-night-surface/50 dark:hover:text-slate-200'} {m.gone ? 'opacity-40 cursor-not-allowed line-through' : ''}"
+						aria-current={isActive ? 'page' : undefined}
+						title={m.gone ? `${m.title} (${m.gone})` : m.title}
+					>
+						<FileGlyph kind="doc" class="size-3 shrink-0 {isActive ? 'text-iris' : 'opacity-60 group-hover:opacity-100'}" />
+						<span class="max-w-[150px] truncate sm:max-w-[200px]">{m.title}</span>
+						{#if m.gone}
+							<span class="text-[9px] uppercase tracking-wider text-red-500 font-mono">
+								{m.gone === 'expired' ? 'exp' : 'cap'}
+							</span>
+						{/if}
+					</a>
+				{/each}
+			</div>
+		</div>
+	</nav>
+{/if}
 
 <!-- top bar -->
 <div class="border-b border-line bg-surface/80 backdrop-blur dark:border-night-line dark:bg-night-surface/80">

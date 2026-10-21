@@ -3,13 +3,20 @@ import { error } from '@sveltejs/kit';
 import { gateDoc, isCrawlerBot, resolveDoc, takeView } from '$lib/server/docs';
 import { resolveDocLinks } from '$lib/server/doclinks';
 import { grantCookieName, verifyGrant } from '$lib/server/grants';
-import { resolveDocBundleGate } from '$lib/server/bundles';
+import {
+	gateBundle,
+	getBundleMembers,
+	getDocBundles,
+	resolveBundle,
+	resolveDocBundleGate,
+	type Bundle
+} from '$lib/server/bundles';
 
 // Loads pre-rendered HTML (no re-parse here).
 // renderMarkdown() runs only at POST time in src/lib/server/markdown.ts.
 // Gated states (gone / passwordRequired) return NO content (html '') but keep
 // the same shape so the reader UI can render its gate screens.
-export const load: PageServerLoad = async ({ params, cookies, request }) => {
+export const load: PageServerLoad = async ({ params, cookies, request, url }) => {
 	const row = await resolveDoc(params.id);
 	if (!row) throw error(404, 'Not found');
 
@@ -52,7 +59,8 @@ export const load: PageServerLoad = async ({ params, cookies, request }) => {
 				linkedPages: [],
 				gone: true as const,
 				goneReason: gate.reason,
-				passwordRequired: false as const
+				passwordRequired: false as const,
+				folderContext: null
 			};
 		}
 		return {
@@ -65,7 +73,8 @@ export const load: PageServerLoad = async ({ params, cookies, request }) => {
 			linkedPages: [],
 			gone: false as const,
 			goneReason: null,
-			passwordRequired: true as const
+			passwordRequired: true as const,
+			folderContext: null
 		};
 	}
 
@@ -82,7 +91,8 @@ export const load: PageServerLoad = async ({ params, cookies, request }) => {
 			linkedPages: [],
 			gone: false as const,
 			goneReason: null,
-			passwordRequired: false as const
+			passwordRequired: false as const,
+			folderContext: null
 		};
 	}
 
@@ -97,7 +107,8 @@ export const load: PageServerLoad = async ({ params, cookies, request }) => {
 			linkedPages: [],
 			gone: true as const,
 			goneReason: 'exhausted' as const,
-			passwordRequired: false as const
+			passwordRequired: false as const,
+			folderContext: null
 		};
 	}
 
@@ -108,6 +119,71 @@ export const load: PageServerLoad = async ({ params, cookies, request }) => {
 	// Doc-to-doc references resolve at read time so links stay live as the
 	// library evolves; the resolved targets also feed the "Linked pages" list.
 	const { html, linked } = await resolveDocLinks(row.html, row.id);
+	// Folder tabs bar resolution: if this doc was opened from a folder,
+	// or belongs to a single parent folder, resolve the folder's sibling files.
+	let folderContext: {
+		id: string;
+		title: string;
+		slug: string | null;
+		href: string;
+		members: {
+			id: string;
+			title: string;
+			slug: string | null;
+			href: string;
+			gone: 'expired' | 'exhausted' | null;
+		}[];
+	} | null = null;
+
+	const fromParam = url.searchParams.get('from');
+	let targetBundleKey: string | null = null;
+	if (fromParam) {
+		const match = fromParam.match(/^\/b\/([A-Za-z0-9_-]{1,64})$/);
+		if (match) targetBundleKey = match[1];
+	}
+
+	let parentBundle: Bundle | undefined;
+	if (targetBundleKey) {
+		parentBundle = await resolveBundle(targetBundleKey);
+	}
+
+	// Fall back to first bundle if doc only belongs to one folder
+	if (!parentBundle) {
+		const docBundles = await getDocBundles(row.id);
+		if (docBundles.length === 1) {
+			parentBundle = docBundles[0];
+		}
+	}
+
+	if (parentBundle) {
+		// Verify visitor is authorized to view this folder
+		const bGate = gateBundle(parentBundle, null);
+		const bGranted =
+			!bGate.ok &&
+			bGate.status === 'locked' &&
+			!!parentBundle.passwordHash &&
+			verifyGrant(parentBundle.id, parentBundle.passwordHash, cookies.get(grantCookieName(parentBundle.id)));
+
+		if (bGate.ok || bGranted) {
+			const members = await getBundleMembers(parentBundle.id);
+			if (members.length > 1) {
+				const bundleHref = `/b/${parentBundle.slug ?? parentBundle.id}`;
+				folderContext = {
+					id: parentBundle.id,
+					title: parentBundle.title,
+					slug: parentBundle.slug,
+					href: bundleHref,
+					members: members.map((m) => ({
+						id: m.id,
+						title: m.title,
+						slug: m.slug,
+						href: `/s/${m.slug ?? m.id}?from=${encodeURIComponent(bundleHref)}`,
+						gone: m.gone
+					}))
+				};
+			}
+		}
+	}
 
 	return {
 		...base,
@@ -118,6 +194,7 @@ export const load: PageServerLoad = async ({ params, cookies, request }) => {
 		linkedPages: linked,
 		gone: false as const,
 		goneReason: null,
-		passwordRequired: false as const
+		passwordRequired: false as const,
+		folderContext
 	};
 };
