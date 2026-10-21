@@ -19,13 +19,25 @@
 		return `${root.classList.contains('dark') ? 'dark' : 'light'}|${root.dataset.theme ?? ''}`;
 	}
 
+	function cleanStrayErrors() {
+		if (typeof document === 'undefined') return;
+		try {
+			const strays = document.body.querySelectorAll(
+				'[id^="dmmd"], [id^="d_mmd"], svg[id^="d_"], .error-icon, [aria-roledescription="error"]'
+			);
+			for (const el of strays) {
+				el.remove();
+			}
+		} catch {}
+	}
+
 	async function renderAll() {
 		// Every invocation invalidates older in-flight runs, so rapid theme
 		// preview hovers collapse to the latest paint instead of racing.
 		const my = ++runId;
 		const root = article;
+		cleanStrayErrors();
 		if (!root || typeof document === 'undefined' || dead) return;
-		// Drop entries orphaned by innerHTML swaps (client navigate/unlock);
 		// their wraps went away with the old content.
 		for (const [pre, info] of rendered) {
 			if (my !== runId || dead) return;
@@ -55,6 +67,7 @@
 			mermaid.initialize({
 				startOnLoad: false,
 				securityLevel: 'strict',
+				suppressErrorRendering: true,
 				theme: dark ? 'dark' : 'default',
 				...(accent
 					? { themeVariables: { primaryColor: accent, primaryBorderColor: accent, lineColor: accent } }
@@ -75,8 +88,24 @@
 			if (prev && prev.src === src && prev.key === key && prev.wrap.isConnected) continue;
 			prev?.wrap.remove();
 			rendered.delete(pre);
+			// Validate diagram syntax before calling render to suppress DOM error injection
 			try {
-				const { svg } = await mermaid.render(`mmd-${Date.now().toString(36)}-${uid++}-${n++}`, src);
+				const valid = await mermaid.parse(src, { suppressErrors: true });
+				if (!valid) {
+					pre.style.display = '';
+					cleanStrayErrors();
+					continue;
+				}
+			} catch {
+				pre.style.display = '';
+				cleanStrayErrors();
+				continue;
+			}
+
+			try {
+				const temp = document.createElement('div');
+				const { svg } = await mermaid.render(`mmd-${Date.now().toString(36)}-${uid++}-${n++}`, src, temp);
+				temp.remove();
 				if (my !== runId || dead) return;
 				const wrap = document.createElement('div');
 				wrap.className = 'mermaid-diagram';
@@ -89,6 +118,7 @@
 			} catch {
 				// Keep the raw code block visible, never a blank hole.
 				pre.style.display = '';
+				cleanStrayErrors();
 			}
 		}
 	}
@@ -133,6 +163,7 @@
 		dead = true;
 		runId++;
 		if (themeTimer) clearTimeout(themeTimer);
+		cleanStrayErrors();
 	});
 </script>
 
