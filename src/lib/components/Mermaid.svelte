@@ -19,11 +19,11 @@
 		return `${root.classList.contains('dark') ? 'dark' : 'light'}|${root.dataset.theme ?? ''}`;
 	}
 
-	function cleanStrayErrors() {
+	function cleanStrayBodyElements() {
 		if (typeof document === 'undefined') return;
 		try {
 			const strays = document.body.querySelectorAll(
-				'[id^="dmmd"], [id^="d_mmd"], svg[id^="d_"], .error-icon, [aria-roledescription="error"]'
+				':scope > div[id^="dmmd-"], :scope > svg[id^="dmmd-"], :scope > iframe[id^="immd-"], :scope > .error-icon, :scope > [aria-roledescription="error"]'
 			);
 			for (const el of strays) {
 				el.remove();
@@ -36,7 +36,7 @@
 		// preview hovers collapse to the latest paint instead of racing.
 		const my = ++runId;
 		const root = article;
-		cleanStrayErrors();
+		cleanStrayBodyElements();
 		if (!root || typeof document === 'undefined' || dead) return;
 		// their wraps went away with the old content.
 		for (const [pre, info] of rendered) {
@@ -88,24 +88,10 @@
 			if (prev && prev.src === src && prev.key === key && prev.wrap.isConnected) continue;
 			prev?.wrap.remove();
 			rendered.delete(pre);
-			// Validate diagram syntax before calling render to suppress DOM error injection
 			try {
-				const valid = await mermaid.parse(src, { suppressErrors: true });
-				if (!valid) {
-					pre.style.display = '';
-					cleanStrayErrors();
-					continue;
-				}
-			} catch {
-				pre.style.display = '';
-				cleanStrayErrors();
-				continue;
-			}
-
-			try {
-				const temp = document.createElement('div');
-				const { svg } = await mermaid.render(`mmd-${Date.now().toString(36)}-${uid++}-${n++}`, src, temp);
-				temp.remove();
+				const id = `mmd-${Date.now().toString(36)}-${uid++}-${n++}`;
+				const { svg } = await mermaid.render(id, src);
+				cleanStrayBodyElements();
 				if (my !== runId || dead) return;
 				const wrap = document.createElement('div');
 				wrap.className = 'mermaid-diagram';
@@ -118,7 +104,7 @@
 			} catch {
 				// Keep the raw code block visible, never a blank hole.
 				pre.style.display = '';
-				cleanStrayErrors();
+				cleanStrayBodyElements();
 			}
 		}
 	}
@@ -163,7 +149,7 @@
 		dead = true;
 		runId++;
 		if (themeTimer) clearTimeout(themeTimer);
-		cleanStrayErrors();
+		cleanStrayBodyElements();
 	});
 </script>
 
